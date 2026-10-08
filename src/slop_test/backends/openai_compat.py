@@ -83,7 +83,11 @@ class OpenAICompatBackend:
         )
 
     def _conversation(self, test: DiscoveredTest) -> list[Message]:
-        prompt = f"Test: {test.qualname}\nDocstring: {test.docstring or '(none)'}"
+        prompt = (
+            f"Test: {test.qualname}\n"
+            f"Language: {test.language}\n"
+            f"Docstring: {test.docstring or '(none)'}"
+        )
         if self.read_the_code:
             prompt += f"\nCode:\n{test.source}"
         return [

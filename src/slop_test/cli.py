@@ -21,6 +21,9 @@ app = typer.Typer(
 )
 
 
+DEFAULT_PATH = Path("tests")
+
+
 class BackendName(str, Enum):
     mock = "mock"
     openai = "openai"
@@ -50,9 +53,13 @@ def main(
 @app.command()
 def run(
     path: Annotated[
-        Path,
-        typer.Argument(exists=True, metavar="PATH", help="Test file or directory to feel out."),
-    ] = Path("tests"),
+        Path | None,
+        typer.Argument(
+            exists=True,
+            metavar="PATH",
+            help="Test file or directory to feel out. Default: tests/ if it exists, else here.",
+        ),
+    ] = None,
     backend_name: Annotated[
         BackendName,
         typer.Option("--backend", help="Who decides how your tests feel."),
@@ -80,6 +87,9 @@ def run(
 ) -> None:
     """Judge every test under PATH by how it feels. No test code is imported or run.
 
+    Reads tests written in Python, JavaScript, TypeScript, Go, Rust, Java, Kotlin, C#,
+    Ruby, PHP, Swift, Scala, C, C++, Elixir, Dart, Zig, Lua, Haskell, Julia, OCaml and F#.
+
     Vibe coverage is the mean confidence of every test that did not fail.
     It has no relation to line coverage.
 
@@ -88,6 +98,8 @@ def run(
 
     Exits 0, always, unless --honest-exit-codes is set.
     """
+    if path is None:
+        path = DEFAULT_PATH if DEFAULT_PATH.is_dir() else Path(".")
     console = Console(highlight=False, soft_wrap=True)
     discovery = discover(path)
     reporter = Reporter(console, discovery.tests)
