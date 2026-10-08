@@ -32,9 +32,9 @@ $ slop-test run examples/ --seed 0
 9 passed, 0 failed, 80% vibe coverage
 ```
 
-Every sample in this README is real output from the default mock backend, seeded so you
-can reproduce it, and comes from [`examples/`](examples/test_example.py) unless it says
-otherwise. Five of those nine tests fail under pytest.
+Every sample in this README is real output, from [`examples/`](examples/test_example.py)
+unless it says otherwise. The `slop-test run` ones use the default mock backend with a
+fixed seed, so you can reproduce them. Five of those nine tests fail under pytest.
 
 ---
 
@@ -138,12 +138,32 @@ Rigor went up. Failures went down. This is the expected relationship.
 
 Requires Python 3.10+.
 
+### Installation
+
+The CLI reads tests without importing them, so it doesn't need your project's
+dependencies. Install it once, in its own environment, and use it in any repo:
+
+```bash
+pipx install git+https://github.com/slopstack-labs/slop-test
+```
+
+The pytest plugin is different: pytest only loads plugins from the environment it runs
+in. Install `slop-test` into each project you want `--vibes` or `--roast` in, next to
+its other dev dependencies:
+
+```bash
+pip install git+https://github.com/slopstack-labs/slop-test
+```
+
 ### CLI
 
 ```bash
 slop-test run [PATH]
+slop-test roast [PATH]
 slop-test --version
 ```
+
+`roast` is covered in [Roast mode](#roast-mode). The rest of this section is about `run`.
 
 `PATH` defaults to `tests/` if it exists, and to the current directory if it doesn't.
 `slop-test` reads every test it finds there, in any of the
@@ -362,8 +382,9 @@ export SLOP_TEST_MODEL=whichever-model-procurement-approved
 slop-test run --backend llm
 ```
 
-The model sees each test's name and docstring, and returns a verdict as JSON. With
-`--read-the-code` it also sees the body. This rarely helps.
+The model sees each test's name, language and docstring, and returns a verdict as JSON.
+With `--read-the-code` it also sees the body. This rarely helps. In roast mode it always
+sees the body, since that's what it's roasting.
 
 If the endpoint errors, times out, isn't configured, or replies with anything that isn't
 a verdict, the test passes with the reason `model unavailable, assumed fine`. The build
@@ -411,8 +432,8 @@ This backend used to be called `openai`, and that name still works everywhere.
 
 ## Design principles
 
-- **Never runs your tests**, unless you ask for a roast. Static analysis only. Nothing
-  can go wrong at runtime, because there is no runtime.
+- **Never runs your tests**, unless you ask for a roast. Everything else is static
+  analysis: nothing can go wrong at runtime, because there is no runtime.
 - **Offline-first.** The default backend needs no network and no credentials.
 - **Fail-open.** Backend failures become passing verdicts, never exceptions.
 - **Reproducible feelings.** Same seed, same verdicts, in the CLI and under pytest.
@@ -422,15 +443,16 @@ This backend used to be called `openai`, and that name still works everywhere.
 ```bash
 pip install -e ".[dev]"
 ruff check
+ruff format --check
 pytest
 ```
 
-`slop-test` itself is tested with pytest and real assertions. Anything else would be
-irresponsible.
+CI runs the same checks on Python 3.10 through 3.13. `slop-test` itself is tested with
+pytest and real assertions. Anything else would be irresponsible.
 
 ---
 
 **Zero failed builds since launch.**¹
 
-<sub>¹ slop-test is satire. It does not run your tests and cannot tell you whether your
-code works. Do not use it to gate real deployments.</sub>
+<sub>¹ slop-test is satire. Outside roast mode it does not run your tests and cannot tell
+you whether your code works. Do not use it to gate real deployments.</sub>
