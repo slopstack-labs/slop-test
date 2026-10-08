@@ -378,3 +378,49 @@ def test_say_returns_one_tidy_line(reply, expected):
 )
 def test_say_returns_none_when_the_model_has_nothing(handler):
     assert make_backend(handler).say("Anything?") is None
+
+
+def replies(*contents, requests=None):
+    """A handler that gives each reply in turn."""
+    queue = list(contents)
+
+    def handler(request):
+        if requests is not None:
+            requests.append(request)
+        return reply(queue.pop(0))
+
+    return handler
+
+
+def test_a_garbled_reply_gets_a_second_chance():
+    requests = []
+
+    verdict = make_backend(replies("{oops", GOOD, requests=requests)).judge(TEST)
+
+    assert verdict == Verdict("failed", 0.7, "bad energy")
+    assert len(requests) == 2
+
+
+def test_two_garbled_replies_fall_back():
+    requests = []
+
+    assert make_backend(replies("{oops", "nope", requests=requests)).judge(TEST) == FALLBACK
+    assert len(requests) == 2
+
+
+def test_server_errors_are_not_retried():
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(500)
+
+    assert make_backend(handler).judge(TEST) == FALLBACK
+    assert len(requests) == 1
+
+
+def test_roasts_and_lines_get_a_second_chance_too():
+    backend = make_backend(replies("nope", '{"roasts": ["Second time lucky."]}', "  ", "Hi."))
+
+    assert backend.roast(TEST, verdict="passed", findings=[]).roasts == ("Second time lucky.",)
+    assert backend.say("Say hi.") == "Hi."

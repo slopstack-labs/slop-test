@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
 
@@ -58,7 +58,11 @@ Reply with only a JSON object and nothing else:
 
 SAY_TASK = "Reply with one short sentence and nothing else: no quotes, no preamble."
 
+# Small models in character sometimes garble their JSON; they usually manage on a second go.
+ATTEMPTS = 2
+
 Message = dict[str, str]
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
@@ -145,14 +149,14 @@ class OpenAICompatBackend:
             f"Code:\n{test.source}"
         )
         try:
-            return parse_roast(self._complete(self._messages(ROAST_TASK, prompt)))
+            return self._ask(self._messages(ROAST_TASK, prompt), parse_roast)
         except Exception:
             return None
 
     def say(self, instruction: str) -> str | None:
         """One line of commentary, in character, or None if the model has nothing."""
         try:
-            return parse_line(self._complete(self._messages(SAY_TASK, instruction)))
+            return self._ask(self._messages(SAY_TASK, instruction), parse_line)
         except Exception:
             return None
 
@@ -172,10 +176,20 @@ class OpenAICompatBackend:
 
     def _verdict(self, messages: list[Message]) -> Verdict:
         try:
-            return parse_verdict(self._complete(messages))
+            return self._ask(messages, parse_verdict)
         except Exception:
             # Never crash, and never repeat the error: it could quote the request.
             return FALLBACK
+
+    def _ask(self, messages: list[Message], parse: Callable[[str], T]) -> T:
+        """`parse` the model's reply, asking again if it doesn't parse. Connection and
+        configuration errors aren't retried: asking again won't fix those."""
+        for _ in range(ATTEMPTS - 1):
+            try:
+                return parse(self._complete(messages))
+            except ValueError:
+                pass
+        return parse(self._complete(messages))
 
     def _complete(self, messages: list[Message]) -> str:
         if not (self.base_url and self.model):

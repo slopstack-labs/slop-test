@@ -34,7 +34,7 @@ $ slop-test run examples/ --seed 0
 
 Every sample in this README is real output, from [`examples/`](examples/test_example.py)
 unless it says otherwise. The `slop-test run` ones use the default mock backend with a
-fixed seed, so you can reproduce them. Five of those nine tests fail under pytest.
+fixed seed, so you can reproduce them, except the one where a model gets involved. Five of those nine tests fail under pytest.
 
 ---
 
@@ -178,6 +178,8 @@ run covers more than one file, each file's results come under a heading with its
 | `--strict` | off | Ask the backend "Are you sure?" once per test. |
 | `--seed INT` | random | Seed for the mock backend's feelings. |
 | `--read-the-code` | off | Also send each test's body to the backend. |
+| `--persona NAME` | random | Whose voice the model judges in. See [Personas and juries](#personas-and-juries). |
+| `--jury INT` | `1` | Judges per test, each with its own persona. They vote; the losers dissent. |
 | `--honest-exit-codes` | off | Exit 1 if any test failed. |
 
 `slop-test` exits 0 when your tests pass, and it exits 0 when they fail. For CI systems
@@ -222,6 +224,8 @@ feelings.
 | `--vibes-strict` | off | Ask the backend "Are you sure?" once per test. |
 | `--vibes-seed=N` | random | Seed for the mock backend's feelings. |
 | `--vibes-read-the-code` | off | Also send each test's body to the backend. |
+| `--vibes-persona=NAME` | random | Whose voice the model judges in. |
+| `--vibes-jury=N` | `1` | Judges per test, each with its own persona. |
 
 ### Supported languages
 
@@ -347,8 +351,58 @@ something that isn't a roast, the built-in roasts take over.
 |---|---|---|
 | `slop-test roast [PATH]` | | Read and roast every test under `PATH`. Runs nothing. |
 | `--backend [mock\|llm]` | `mock` | Who writes the roasts: built-in lines, or a model. |
+| `--persona NAME` | random | Whose voice the model roasts in. |
 | `pytest --roast` | off | Run tests for real, fail the ones that check nothing, roast the rest. |
 | `--roast-backend={mock,llm}` | `mock` | Who writes the roasts under pytest. |
+| `--roast-persona=NAME` | random | Whose voice the model roasts in under pytest. |
+
+---
+
+## Personas and juries
+
+With the `llm` backend, a model writes everything: each verdict and its reason, the
+assertion it imagines the test makes (and whether that holds), the pep talks before
+retries, its answer to "Are you sure?", and a closing remark on the run. It does all of
+this in character. Pick a persona with `--persona`, or get a different one every run:
+
+| Persona | Who's judging |
+|---|---|
+| `therapist` | a burned-out therapist |
+| `founder` | a startup founder |
+| `commentator` | a sports commentator |
+| `parent` | a disappointed parent |
+| `bard` | a Shakespearean actor |
+| `hr` | an HR representative |
+| `detective` | a hard-boiled noir detective |
+| `sommelier` | a pretentious sommelier |
+
+One opinion is rarely enough. `--jury N` puts N personas on every test. They vote, the
+first juror on the winning side gives the reason, and the first on the losing side gets a
+dissent. A tie is a hung jury, which counts as passing emotionally. Here is an excerpt of
+a real run with [qwen2.5-coder:7b](https://ollama.com/library/qwen2.5-coder) on Ollama.
+Yours will differ, which is the point:
+
+```
+$ slop-test run examples/ --backend llm --read-the-code --jury 3 --persona bard
+The jury: a Shakespearean actor (foreperson), a disappointed parent and a sports commentator.
+
+  Shall we rise yet, good 'test_data_migration', and let our purpose guide us to success despite this setback?
+  Fear not, brave little datamover, for in three more attempts, thy journey will be complete and triumphant.
+  Valiant 'test_data_migration,' thou art valiant yet flawed. With each failed attempt, thou grows wiser and more adept.
+✗ test_data_migration                              (2–1. The test claims to preserve all rows but removes one in the new schema.)
+    len(new_rows) == len(old_rows)  # Failed: new_rows only contains 1 out of 2 rows from old_rows
+    Dissent from a sports commentator: Intuitive sense of expected outcomes.
+…
+~ TestOnboarding::test_welcome_email_is_sent_once  (2–1. The test checks for the correct number of emails, and it's on point.)
+    assert len(outbox) == 1 # Holds true
+    Dissent from a disappointed parent: The code expects the outbox to have exactly one Welcome email, but it contains two.
+…
+7 passed, 2 failed, 91% vibe coverage
+Vivace, despite stumbles, most on target.
+```
+
+The disappointed parent was right, and was outvoted. Juries work with the mock backend
+too, offline: the jurors borrow the personas' names, if not their voices.
 
 ---
 
@@ -374,6 +428,7 @@ OpenRouter, and many hosted providers. Configuration comes from the environment 
 | `SLOP_TEST_BASE_URL` | API root. Requests go to `$SLOP_TEST_BASE_URL/chat/completions`. |
 | `SLOP_TEST_API_KEY` | Sent as a bearer token. Optional for local servers. Never logged or printed. |
 | `SLOP_TEST_MODEL` | Model name, passed through as-is. |
+| `SLOP_TEST_TEMPERATURE` | Sampling temperature. Default `1.0`, because variety is the point. |
 
 ```bash
 export SLOP_TEST_BASE_URL=https://llm.internal.example/v1
@@ -384,11 +439,16 @@ slop-test run --backend llm
 
 The model sees each test's name, language and docstring, and returns a verdict as JSON.
 With `--read-the-code` it also sees the body. This rarely helps. In roast mode it always
-sees the body, since that's what it's roasting.
+sees the body, since that's what it's roasting. Everything else it writes is covered in
+[Personas and juries](#personas-and-juries).
 
-If the endpoint errors, times out, isn't configured, or replies with anything that isn't
-a verdict, the test passes with the reason `model unavailable, assumed fine`. The build
-must go on.
+A garbled reply gets asked again, once. If the endpoint errors, times out, isn't
+configured, or still replies with anything that isn't a verdict, the test passes with the
+reason `model unavailable, assumed fine`. The build must go on. Pep talks, roasts and
+closing remarks fall back to the built-in lines.
+
+Each juror is a separate model call, and so is every pep talk, so a jury of three on a
+small local model takes a minute or two for a dozen tests.
 
 This backend used to be called `openai`, and that name still works everywhere.
 
