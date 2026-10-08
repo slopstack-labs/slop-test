@@ -5,8 +5,8 @@ from fakes import make_test
 
 from slop_test.backends import Backend, get_backend
 from slop_test.backends.mock import (
-    CAVE_REASON,
-    DOUBT_REASON,
+    CAVE_REASONS,
+    DOUBT_REASONS,
     FAIL_REASONS,
     PASS_REASONS,
     MockBackend,
@@ -86,9 +86,9 @@ def test_are_you_sure_can_flip_either_way_or_hold():
     passed = [backend.are_you_sure(t, Verdict("passed", 0.8, "fine")) for t in TESTS * 4]
     failed = [backend.are_you_sure(t, Verdict("failed", 0.8, "not fine")) for t in TESTS * 4]
 
-    assert {v.reason for v in passed if v.failed} == {DOUBT_REASON}
+    assert {v.reason for v in passed if v.failed} <= set(DOUBT_REASONS)
     assert any(not v.failed for v in passed)
-    assert {v.reason for v in failed if not v.failed} == {CAVE_REASON}
+    assert {v.reason for v in failed if not v.failed} <= set(CAVE_REASONS)
     assert any(v.failed for v in failed)
 
 
@@ -107,3 +107,11 @@ def test_get_backend():
 def test_get_backend_rejects_unknown_names():
     with pytest.raises(ValueError, match="unknown backend 'oracle'"):
         get_backend("oracle")
+
+
+def test_reasons_vary_across_a_suite():
+    backend = MockBackend(seed=1)
+
+    reasons = {backend.judge(make_test(f"test_feature_{i}")).reason for i in range(300)}
+
+    assert len(reasons) > 40

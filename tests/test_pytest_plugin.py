@@ -3,12 +3,13 @@ from importlib.metadata import entry_points
 from pathlib import Path
 
 import pytest
-from fakes import ScriptedBackend, patch_bench
+from fakes import ScriptedBackend, make_test, patch_bench
 
 from slop_test.backends.mock import MockBackend
 from slop_test.discovery import discover
 from slop_test.judge import judge
-from slop_test.roast import DEV_ROASTS, ROASTS
+from slop_test.report import supportive_line
+from slop_test.roast import CLOSERS, DEV_ROASTS, ROASTS
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 WORDS = {"passed": "PASSED", "passed_emotionally": "PASSED EMOTIONALLY", "failed": "FAILED"}
@@ -85,10 +86,8 @@ def test_vibes_replaces_real_outcomes(pytester, scripted):
             "*::TestThings::test_method PASSED*",
             "*Felt like a failure: scripted failed (confidence 40%)",
             "*= vibe check =*",
-            "You've got this, test_really_passes.",
-            "Take your time, test_really_passes. There's no rush.",
-            "test_really_passes, every test fails sometimes. It doesn't define you.",
-            "You've got this, test_wobbly.",
+            *(supportive_line(make_test("test_really_passes"), n) for n in (1, 2, 3)),
+            supportive_line(make_test("test_wobbly"), 1),
             "3 passed, 1 failed, 90% vibe coverage",
         ]
     )
@@ -258,7 +257,7 @@ def test_roast_runs_tests_for_real_and_fails_the_weak_ones(pytester):
             "✓ *::test_genuinely_fine: passed*",
             "- *::test_skipped: skipped*",
             "✗ *::test_setup_explodes: failed*",
-            "1 passed, 4 failed, 1 skipped. About what I expected.",
+            "1 passed, 4 failed, 1 skipped. *",
         ]
     )
     assert result.ret == pytest.ExitCode.TESTS_FAILED
@@ -270,7 +269,8 @@ def test_roast_only_passes_honest_suites(pytester):
     result = pytester.runpytest("--roast")
 
     result.assert_outcomes(passed=1)
-    result.stdout.fnmatch_lines(["1 passed, 0 failed. Everything passed. I don't trust it."])
+    [summary] = [line for line in result.outlines if line.startswith("1 passed, 0 failed. ")]
+    assert summary.removeprefix("1 passed, 0 failed. ") in CLOSERS["all passed"]
     assert result.ret == pytest.ExitCode.OK
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import zlib
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
@@ -31,11 +32,49 @@ SUPPORTIVE_LINES = (
     "{name}, every test fails sometimes. It doesn't define you.",
     "Deep breaths, {name}.",
     "We believe in you, {name}.",
+    "{name}, failing is just passing that hasn't happened yet.",
+    "Nobody's watching, {name}. Except CI.",
+    "{name}, you're more than your exit code.",
+    "Shake it off, {name}.",
+    "{name}, remember why you were written.",
+    "It's not you, {name}. It's the environment.",
+    "One more time, {name}, with feeling.",
+    "{name}, the build believes in you. Mostly.",
+    "Hydrate, {name}. Then pass.",
+    "{name}, you miss 100% of the assertions you don't make.",
+    "Small steps, {name}. Green ones.",
+    "{name}, this is a safe space.",
+    "Visualize the green checkmark, {name}.",
+    "{name}, your stack trace is valid.",
+    "Chin up, {name}. Flakiness is temporary.",
+    "{name}, the tests that fail are the ones that grow.",
+    "Breathe in, {name}. Breathe out green.",
+    "{name}, nobody remembers the first attempt.",
+    "You're doing great, {name}. Statistically.",
+    "{name}, there's no shame in a retry.",
+    "Ignore the logs, {name}. Focus on the vibes.",
+    "{name}, you've passed before. Probably.",
+    "Give it everything, {name}. Then a bit more.",
+    "{name}, the pipeline sees your effort.",
+    "Be the green you want to see, {name}.",
+    "Stay hydrated and assertive, {name}.",
+    "{name}, your mocks believe in you.",
+    "This one's for the team, {name}.",
+    "{name}, you're not flaky, you're spontaneous.",
+    "Clear your cache, {name}. And your mind.",
+    "{name}, failure is just feedback with bad timing.",
+    "Show them what you're made of, {name}. Ideally green.",
+    "{name}, every great test was once red.",
+    "It's a marathon, {name}, not a sprint. It's also a sprint.",
+    "Trust your fixtures, {name}.",
 )
 
 
 def supportive_line(test: DiscoveredTest, attempt: int) -> str:
-    return SUPPORTIVE_LINES[(attempt - 1) % len(SUPPORTIVE_LINES)].format(name=test.name)
+    """Pep talks come in a fixed order, but each test starts somewhere different in it, so
+    retries never repeat themselves and no two tests hear the same thing first."""
+    start = zlib.crc32(test.qualname.encode())
+    return SUPPORTIVE_LINES[(start + attempt - 1) % len(SUPPORTIVE_LINES)].format(name=test.name)
 
 
 def bench_line(personas: Sequence[Persona]) -> str:

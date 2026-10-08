@@ -3,12 +3,13 @@ import textwrap
 from pathlib import Path
 
 import pytest
-from fakes import ScriptedBackend, patch_bench
+from fakes import ScriptedBackend, make_test, patch_bench
 from typer.testing import CliRunner
 
 from slop_test import __version__
 from slop_test.cli import app
 from slop_test.discovery import discover
+from slop_test.report import supportive_line
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 SUMMARY = re.compile(r"^\d+ passed, \d+ failed, \d+% vibe coverage$", re.MULTILINE)
@@ -90,14 +91,15 @@ def test_output_format(suite, scripted):
 
     result = invoke("run", suite, "--seed", "0")
 
+    migration, flaky = make_test("test_migration"), make_test("test_flaky")
     assert result.output == textwrap.dedent(
-        """\
+        f"""\
         ✓ test_login      (scripted passed)
-          You've got this, test_migration.
+          {supportive_line(migration, 1)}
         ~ test_migration  (passed, emotionally)
-          You've got this, test_flaky.
-          Take your time, test_flaky. There's no rush.
-          test_flaky, every test fails sometimes. It doesn't define you.
+          {supportive_line(flaky, 1)}
+          {supportive_line(flaky, 2)}
+          {supportive_line(flaky, 3)}
         ✗ test_flaky      (scripted failed)
 
         2 passed, 1 failed, 90% vibe coverage
@@ -116,9 +118,9 @@ def test_runs_over_several_files_get_file_headings(tmp_path, scripted, monkeypat
     result = invoke("run", ".", "--seed", "0")
 
     assert result.output == textwrap.dedent(
-        """\
+        f"""\
         cart_test.go (Go)
-          You've got this, TestCheckout.
+          {supportive_line(make_test("TestCheckout"), 1)}
         ~ TestCheckout   (passed, emotionally)
 
         test_cart.py (Python)

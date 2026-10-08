@@ -18,16 +18,16 @@ pip install git+https://github.com/slopstack-labs/slop-test
 
 ```
 $ slop-test run examples/ --seed 0
-✓ test_user_login                                  (probably fine)
-✓ test_payment_processing                          (trust the process)
-  You've got this, test_data_migration.
+✓ test_user_login                                  (good energy)
+✓ test_payment_processing                          (it's a keeper)
+  test_data_migration, you're not flaky, you're spontaneous.
 ~ test_data_migration                              (passed, emotionally)
-✓ test_legacy_invoice_rounding                     (no notes)
-✓ test_friday_prod_deploy                          (probably fine)
-✓ test_cache_invalidation                          (LGTM)
+✓ test_legacy_invoice_rounding                     (won the room)
+✓ test_friday_prod_deploy                          (LGTM)
+✓ test_cache_invalidation                          (unblocks the roadmap)
 ✓ test_it_works_on_my_machine                      (felt right)
-✓ TestOnboarding::test_welcome_email_is_sent_once  (the name checks out)
-✓ TestOnboarding::test_dark_mode_is_respected      (trust the process)
+✓ TestOnboarding::test_welcome_email_is_sent_once  (battle-tested, presumably)
+✓ TestOnboarding::test_dark_mode_is_respected      (a test with integrity)
 
 9 passed, 0 failed, 80% vibe coverage
 ```
@@ -71,7 +71,7 @@ reports as a range of emotional outcomes.
 For audit and compliance purposes, every run ends with the seed it used:
 
 ```
-9 passed, 0 failed, 77% vibe coverage
+8 passed, 1 failed, 80% vibe coverage
 To feel this way again: --seed 53771
 ```
 
@@ -86,22 +86,21 @@ still fails after every retry stays failed. We respect its decision.
 
 ```
 $ slop-test run examples/ --seed 2
-✓ test_user_login                                  (passed the sniff test)
-  You've got this, test_payment_processing.
-  Take your time, test_payment_processing. There's no rush.
+✓ test_user_login                                  (it just has that look)
+  test_payment_processing, you're more than your exit code.
 ~ test_payment_processing                          (passed, emotionally)
-✓ test_data_migration                              (looked confident)
-✓ test_legacy_invoice_rounding                     (probably fine)
-  You've got this, test_friday_prod_deploy.
-  Take your time, test_friday_prod_deploy. There's no rush.
-  test_friday_prod_deploy, every test fails sometimes. It doesn't define you.
-✗ test_friday_prod_deploy                          (mercury in retrograde)
-✓ test_cache_invalidation                          (LGTM)
-✓ test_it_works_on_my_machine                      (probably fine)
-✓ TestOnboarding::test_welcome_email_is_sent_once  (passed the sniff test)
-✓ TestOnboarding::test_dark_mode_is_respected      (worked on my machine)
+✓ test_data_migration                              (firm handshake)
+✓ test_legacy_invoice_rounding                     (nothing to see here)
+  test_friday_prod_deploy, your mocks believe in you.
+  This one's for the team, test_friday_prod_deploy.
+  test_friday_prod_deploy, you're not flaky, you're spontaneous.
+✗ test_friday_prod_deploy                          (won't survive code review)
+✓ test_cache_invalidation                          (approved by the vibe council)
+✓ test_it_works_on_my_machine                      (seemed fine from here)
+✓ TestOnboarding::test_welcome_email_is_sent_once  (vibes immaculate)
+✓ TestOnboarding::test_dark_mode_is_respected      (peer-reviewed by feelings)
 
-8 passed, 1 failed, 78% vibe coverage
+8 passed, 1 failed, 82% vibe coverage
 ```
 
 ### `--strict` mode
@@ -112,22 +111,21 @@ is asked exactly once per test. Asking twice is how you get a third answer.
 
 ```
 $ slop-test run examples/ --seed 2 --strict
-✓ test_user_login                                  (passed the sniff test)
-  You've got this, test_payment_processing.
-  Take your time, test_payment_processing. There's no rush.
+✓ test_user_login                                  (it just has that look)
+  test_payment_processing, you're more than your exit code.
 ~ test_payment_processing                          (passed, emotionally)
-✓ test_data_migration                              (looked confident)
-✓ test_legacy_invoice_rounding                     (probably fine)
-  You've got this, test_friday_prod_deploy.
-  Take your time, test_friday_prod_deploy. There's no rush.
-  test_friday_prod_deploy, every test fails sometimes. It doesn't define you.
-✓ test_friday_prod_deploy                          (you're absolutely right, it passed)
-✓ test_cache_invalidation                          (LGTM)
-✓ test_it_works_on_my_machine                      (probably fine)
-✓ TestOnboarding::test_welcome_email_is_sent_once  (passed the sniff test)
-✓ TestOnboarding::test_dark_mode_is_respected      (worked on my machine)
+✓ test_data_migration                              (firm handshake)
+✓ test_legacy_invoice_rounding                     (nothing to see here)
+  test_friday_prod_deploy, your mocks believe in you.
+  This one's for the team, test_friday_prod_deploy.
+  test_friday_prod_deploy, you're not flaky, you're spontaneous.
+✓ test_friday_prod_deploy                          (my mistake, it passes)
+✓ test_cache_invalidation                          (approved by the vibe council)
+✓ test_it_works_on_my_machine                      (seemed fine from here)
+✓ TestOnboarding::test_welcome_email_is_sent_once  (vibes immaculate)
+✓ TestOnboarding::test_dark_mode_is_respected      (peer-reviewed by feelings)
 
-9 passed, 0 failed, 79% vibe coverage
+9 passed, 0 failed, 81% vibe coverage
 ```
 
 Rigor went up. Failures went down. This is the expected relationship.
@@ -265,9 +263,9 @@ FAILED examples/test_example.py::TestOnboarding::test_welcome_email_is_sent_once
 $ pytest examples/ -q --vibes --vibes-seed 0
 ..~......                                                                [100%]
 ================================== vibe check ==================================
-You've got this, test_data_migration.
+test_data_migration, you're not flaky, you're spontaneous.
 9 passed, 0 failed, 80% vibe coverage
-9 passed in 0.01s
+9 passed in 0.00s
 ```
 
 (Recorded on a Thursday. `test_friday_prod_deploy` is only correct six days a week.)
@@ -295,12 +293,12 @@ test runner would, and names them after the groups they sit in:
 
 ```
 $ slop-test run tests/fixtures/polyglot/js --seed 0
-✓ Cart::adds an item                     (vibes immaculate)
-✓ Cart::applies legacy discounts         (no notes)
-✓ Cart::with %i items::totals correctly  (worked on my machine)
-✓ works without a describe               (vibes immaculate)
-✓ handles %i                             (looked confident)
-✓ supports template names                (seemed fine from here)
+✓ Cart::adds an item                     (it compiled emotionally)
+✓ Cart::applies legacy discounts         (felt deterministic enough)
+✓ Cart::with %i items::totals correctly  (low risk, high vibes)
+✓ works without a describe               (QA would sign off, probably)
+✓ handles %i                             (firm handshake)
+✓ supports template names                (aligned with stakeholder expectations)
 
 6 passed, 0 failed, 82% vibe coverage
 ```
@@ -347,23 +345,23 @@ passes under plain pytest:
 $ pytest examples/roast_me.py -q --roast --tb=no
 .FF.F.                                                                   [100%]
 ==================================== roast =====================================
-✓ examples/roast_me.py::test_charge_adds_vat: passed, somehow
+✓ examples/roast_me.py::test_charge_adds_vat: passed. For now.
 ✗ examples/roast_me.py::test_it_works: passed, but it checks nothing
-    You wrote this to make the test count go up, not to find bugs. It worked.
-    You named it 'test_it_works'. Naming things is hard, and you didn't even try.
+    You call this a test. The code under test calls it a day off.
+    'test_it_works'. You named it the way people name Wi-Fi networks.
 ✗ examples/roast_me.py::test_vat_is_correct: passed, but only proves that true is true
-    You made the test pass by testing nothing. Management would be proud.
-✓ examples/roast_me.py::test_receipt_is_eventually_emailed: passed. For now.
+    You checked that true is true. Somewhere, a QA engineer felt a chill.
+✓ examples/roast_me.py::test_receipt_is_eventually_emailed: passed, somehow
     You put sleep() in a test. You don't fix race conditions, you wait them out.
-    1.1s. You run this and go make coffee, don't you.
-    You debug with print() and leave the evidence at the scene.
+    1.1s. Your test suite is the reason you have a second monitor.
+    You print instead of asserting. You want to see the problem, not stop it.
 ✗ examples/roast_me.py::test_refund_never_crashes: passed, but it checks nothing
-    You wrote a test that checks nothing, then went to lunch.
-    You catch exceptions and do nothing with them. Very healthy. Very you.
-✓ examples/roast_me.py::test_checkout_with_everything_mocked: passed. Suspicious.
-    You mocked everything so nothing could hurt you. Your therapist would like a word.
-    You left a TODO. We both know you're never coming back for it.
-3 passed, 3 failed. About what I expected.
+    No assertions. You're not testing, you're just making sure it doesn't explode.
+    An empty except. You'd rather not know, and now you won't.
+✓ examples/roast_me.py::test_checkout_with_everything_mocked: passed. I'll be checking again.
+    This much mocking is a trust issue, not a test strategy.
+    A TODO, from you. That's not a plan, that's a confession.
+3 passed, 3 failed. Disappointing, but not surprising.
 =========================== short test summary info ============================
 FAILED examples/roast_me.py::test_it_works - Passed, but it checks nothing.
 FAILED examples/roast_me.py::test_vat_is_correct - Passed, but only proves th...
@@ -391,21 +389,21 @@ it a reasonable, if rude, lint step:
 
 ```
 $ slop-test roast examples/roast_me.py
-? test_charge_adds_vat                  (not run. Assume the worst.)
+? test_charge_adds_vat                  (not run. Innocent until proven guilty, but I've seen the code.)
 ✗ test_it_works                         (checks nothing, so it can't pass)
-    You wrote this to make the test count go up, not to find bugs. It worked.
-    You named it 'test_it_works'. Naming things is hard, and you didn't even try.
+    You call this a test. The code under test calls it a day off.
+    'test_it_works'. You named it the way people name Wi-Fi networks.
 ✗ test_vat_is_correct                   (only checks that true is true, so it can't pass)
-    You made the test pass by testing nothing. Management would be proud.
-? test_receipt_is_eventually_emailed    (not run. Assume the worst.)
+    You checked that true is true. Somewhere, a QA engineer felt a chill.
+? test_receipt_is_eventually_emailed    (not run. Innocent until proven guilty, but I've seen the code.)
     You put sleep() in a test. You don't fix race conditions, you wait them out.
-    You debug with print() and leave the evidence at the scene.
+    You print instead of asserting. You want to see the problem, not stop it.
 ✗ test_refund_never_crashes             (checks nothing, so it can't pass)
-    You wrote a test that checks nothing, then went to lunch.
-    You catch exceptions and do nothing with them. Very healthy. Very you.
+    No assertions. You're not testing, you're just making sure it doesn't explode.
+    An empty except. You'd rather not know, and now you won't.
 ? test_checkout_with_everything_mocked  (not run, so probably broken)
-    You mocked everything so nothing could hurt you. Your therapist would like a word.
-    You left a TODO. We both know you're never coming back for it.
+    This much mocking is a trust issue, not a test strategy.
+    A TODO, from you. That's not a plan, that's a confession.
 
 0 passed, 3 failed, 3 not run. About what I expected.
 ```

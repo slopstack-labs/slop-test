@@ -218,19 +218,20 @@ def verdicts(*statuses):
 
 
 @pytest.mark.parametrize(
-    ("statuses", "line"),
+    ("statuses", "counts", "mood"),
     [
-        (("failed", "failed"), f"0 passed, 2 failed. {CLOSERS['all failed']}"),
-        (
-            ("passed", "failed", "skipped"),
-            f"1 passed, 1 failed, 1 skipped. {CLOSERS['some failed']}",
-        ),
-        (("passed", "passed"), f"2 passed, 0 failed. {CLOSERS['all passed']}"),
-        (("not run", "passed"), f"1 passed, 0 failed, 1 not run. {CLOSERS['none ran']}"),
+        (("failed", "failed"), "0 passed, 2 failed. ", "all failed"),
+        (("passed", "failed", "skipped"), "1 passed, 1 failed, 1 skipped. ", "some failed"),
+        (("passed", "passed"), "2 passed, 0 failed. ", "all passed"),
+        (("not run", "passed"), "1 passed, 0 failed, 1 not run. ", "none ran"),
     ],
 )
-def test_summary_line(statuses, line):
-    assert summary_line(verdicts(*statuses)) == line
+def test_summary_line(statuses, counts, mood):
+    line = summary_line(verdicts(*statuses))
+
+    assert line.startswith(counts)
+    assert line.removeprefix(counts) in CLOSERS[mood]
+    assert summary_line(verdicts(*statuses)) == line  # same results, same remark
 
 
 @pytest.fixture
@@ -258,7 +259,7 @@ def test_cli_roast_output_and_exit_code(suite):
     assert lines[0].startswith("? test_total           (")
     assert lines[1] == "✗ test_vat_is_correct  (only checks that true is true, so it can't pass)"
     assert lines[2].startswith("    ")
-    assert lines[-1] == f"0 passed, 1 failed, 1 not run. {CLOSERS['some failed']}"
+    assert lines[-1].removeprefix("0 passed, 1 failed, 1 not run. ") in CLOSERS["some failed"]
 
 
 def test_cli_roast_exits_0_when_nothing_is_weak(tmp_path):
@@ -267,7 +268,7 @@ def test_cli_roast_exits_0_when_nothing_is_weak(tmp_path):
     result = runner.invoke(app, ["roast", str(tmp_path)])
 
     assert result.exit_code == 0
-    assert result.output.splitlines()[-1].endswith(CLOSERS["none ran"])
+    assert result.output.splitlines()[-1].endswith(tuple(CLOSERS["none ran"]))
 
 
 def test_cli_roast_with_an_unconfigured_model_uses_built_in_roasts(suite, monkeypatch):
