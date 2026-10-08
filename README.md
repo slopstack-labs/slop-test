@@ -147,7 +147,8 @@ slop-test --version
 `PATH` defaults to `tests/` if it exists, and to the current directory if it doesn't.
 `slop-test` reads every test it finds there, in any of the
 [supported languages](#supported-languages): Python with `ast`, everything else with
-[tree-sitter](https://tree-sitter.github.io/). Nothing is imported. Nothing runs.
+[tree-sitter](https://tree-sitter.github.io/). Nothing is imported. Nothing runs. When a
+run covers more than one file, each file's results come under a heading with its path.
 
 | Option | Default | Description |
 |---|---|---|

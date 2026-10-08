@@ -116,6 +116,7 @@ def run(
     backend = get_backend(backend_name.value, seed=seed, read_the_code=read_the_code)
     verdicts = []
     for test in discovery.tests:
+        reporter.starting(test)
         verdict = judge(test, backend, retries=retries, strict=strict, on_retry=reporter.retrying)
         reporter.result(test, verdict)
         verdicts.append(verdict)

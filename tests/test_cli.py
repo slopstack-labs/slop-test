@@ -109,6 +109,30 @@ def test_output_format(suite, scripted):
     )
 
 
+def test_runs_over_several_files_get_file_headings(tmp_path, scripted, monkeypatch):
+    (tmp_path / "test_cart.py").write_text("def test_checkout():\n    pass\n")
+    (tmp_path / "cart_test.go").write_text(
+        'package cart\n\nimport "testing"\n\nfunc TestCheckout(t *testing.T) {}\n'
+    )
+    scripted({"TestCheckout": ["failed", "passed"]})
+    monkeypatch.chdir(tmp_path)
+
+    result = invoke("run", ".", "--seed", "0")
+
+    assert result.output == textwrap.dedent(
+        """\
+        cart_test.go (Go)
+          You've got this, TestCheckout.
+        ~ TestCheckout   (passed, emotionally)
+
+        test_cart.py (Python)
+        ✓ test_checkout  (scripted passed)
+
+        2 passed, 0 failed, 90% vibe coverage
+        """
+    )
+
+
 @pytest.mark.parametrize(
     ("args", "script", "exit_code"),
     [
