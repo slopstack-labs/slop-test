@@ -27,6 +27,11 @@ def code(name, source, language="Python"):
             "def test_x():\n    with pytest.raises(ValueError):\n        charge(-1)\n",
             None,
         ),
+        (
+            "Python",
+            "def test_x(pytester):\n    pytester.runpytest().stdout.fnmatch_lines(['*'])\n",
+            None,
+        ),
         ("JavaScript", "it('x', () => {\n  render();\n})", "no_assertions"),
         ("JavaScript", "it('x', () => {\n  expect(true).toBe(true);\n})", "trivial"),
         ("JavaScript", "it('x', () => {\n  expect(total()).toBe(3);\n})", None),
@@ -83,6 +88,14 @@ def test_names_strings_and_comments_dont_count_as_assertions(source):
 )
 def test_spots_smells(source, kind):
     assert kind in critique(code("test_x", source))
+
+
+def test_todos_count_in_comments_not_in_strings():
+    in_comment = code("test_x", "def test_x():\n    # TODO: more\n    assert ok()\n")
+    in_string = code("test_x", "def test_x():\n    assert parse('# TODO: more')\n")
+
+    assert "todo" in critique(in_comment)
+    assert "todo" not in critique(in_string)
 
 
 @pytest.mark.parametrize("name", ["test_it_works", "test1", "Test", "TestStuff", "works"])

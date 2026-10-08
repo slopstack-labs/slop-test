@@ -33,6 +33,7 @@ _ASSERTION = re.compile(
     r"|(?:\b|_)(?:EXPECT|ASSERT|REQUIRE|CHECK)\w*\s*\("
     r"|\bt\.(?:Error|Errorf|Fatal|Fatalf|Fail|FailNow)\s*\("
     r"|\bpanic!|\.unwrap\(\)|@test\b|\bfail\s*\(|@\?=|\(check\b|pytest\.(?:raises|warns)"
+    r"|\.(?:fnmatch|re_match)_lines\("
 )
 # Assertions that can't fail: `assert True`, `assertEquals(1, 1)`, `expect(true).toBe(true)`.
 _TRIVIAL = (
@@ -184,7 +185,7 @@ def critique(test: DiscoveredTest, *, duration: float | None = None) -> list[str
         kinds.append("mocks")
     if _PRINT.search(code):
         kinds.append("print")
-    if _TODO.search(test.source):
+    if _TODO.search(_STRING.sub('""', test.source)):  # in comments, not in test data
         kinds.append("todo")
     if len(test.source.splitlines()) > LONG_TEST_LINES:
         kinds.append("long")
