@@ -7,7 +7,8 @@ a single point in time, and then fails at the worst possible moment, usually in 
 people. `slop-test` removes them from the loop. A model reads the name of each test,
 considers its docstring, and decides whether it feels like it passed.
 
-Your test code is never imported or executed. It doesn't need to be. This works in
+Your test code is never imported or executed. It doesn't need to be. (Unless you ask for a
+[roast](#roast-mode).) This works in
 [22 languages](#supported-languages): `slop-test` runs none of them, so it supports all of
 them equally.
 
@@ -31,9 +32,9 @@ $ slop-test run examples/ --seed 0
 9 passed, 0 failed, 80% vibe coverage
 ```
 
-Every sample in this README is real output from the default mock backend, seeded so you
-can reproduce it, and comes from [`examples/`](examples/test_example.py) unless it says
-otherwise. Five of those nine tests fail under pytest.
+Every sample in this README is real output, from [`examples/`](examples/test_example.py)
+unless it says otherwise. The `slop-test run` ones use the default mock backend with a
+fixed seed, so you can reproduce them. Five of those nine tests fail under pytest.
 
 ---
 
@@ -137,12 +138,32 @@ Rigor went up. Failures went down. This is the expected relationship.
 
 Requires Python 3.10+.
 
+### Installation
+
+The CLI reads tests without importing them, so it doesn't need your project's
+dependencies. Install it once, in its own environment, and use it in any repo:
+
+```bash
+pipx install git+https://github.com/slopstack-labs/slop-test
+```
+
+The pytest plugin is different: pytest only loads plugins from the environment it runs
+in. Install `slop-test` into each project you want `--vibes` or `--roast` in, next to
+its other dev dependencies:
+
+```bash
+pip install git+https://github.com/slopstack-labs/slop-test
+```
+
 ### CLI
 
 ```bash
 slop-test run [PATH]
+slop-test roast [PATH]
 slop-test --version
 ```
+
+`roast` is covered in [Roast mode](#roast-mode). The rest of this section is about `run`.
 
 `PATH` defaults to `tests/` if it exists, and to the current directory if it doesn't.
 `slop-test` reads every test it finds there, in any of the
@@ -152,7 +173,7 @@ run covers more than one file, each file's results come under a heading with its
 
 | Option | Default | Description |
 |---|---|---|
-| `--backend [mock\|openai]` | `mock` | Who decides how your tests feel. |
+| `--backend [mock\|llm]` | `mock` | Who decides how your tests feel. |
 | `--retries INT` | `3` | Empathetic retries for each failed test. |
 | `--strict` | off | Ask the backend "Are you sure?" once per test. |
 | `--seed INT` | random | Seed for the mock backend's feelings. |
@@ -196,7 +217,7 @@ feelings.
 | Option | Default | Description |
 |---|---|---|
 | `--vibes` | off | Replace each test's real outcome with how it feels. |
-| `--vibes-backend={mock,openai}` | `mock` | Who decides how your tests feel. |
+| `--vibes-backend={mock,llm}` | `mock` | Who decides how your tests feel. |
 | `--vibes-retries=N` | `3` | Empathetic retries for each failed test. |
 | `--vibes-strict` | off | Ask the backend "Are you sure?" once per test. |
 | `--vibes-seed=N` | random | Seed for the mock backend's feelings. |
@@ -244,8 +265,90 @@ $ slop-test run tests/fixtures/polyglot/js --seed 0
 | F# | `*Test.fs`, `*Tests.fs`, anything in a test directory | `[<Fact>]`, `[<Test>]` and friends; Expecto `testCase` inside `testList` |
 
 A test directory is one named `test`, `tests`, `spec`, `specs` or `__tests__`. Doc
-comments right above a test count as its docstring, which is what the `openai` backend
+comments right above a test count as its docstring, which is what the `llm` backend
 reads.
+
+---
+
+## Roast mode
+
+For when you'd like the truth, delivered unkindly.
+
+Everything above avoids running your tests. Roast mode runs them, then reads them, and
+assumes the worst about both. Every test in [`examples/roast_me.py`](examples/roast_me.py)
+passes under plain pytest:
+
+```
+$ pytest examples/roast_me.py -q --roast --tb=no
+.FF.F.                                                                   [100%]
+==================================== roast =====================================
+✓ examples/roast_me.py::test_charge_adds_vat: passed, somehow
+✗ examples/roast_me.py::test_it_works: passed, but it checks nothing
+    This test asserts nothing. It's not a test, it's a wish.
+    Named 'test_it_works'. Very descriptive. Of nothing.
+✗ examples/roast_me.py::test_vat_is_correct: passed, but only proves that true is true
+    It checks that true is true. Bold, but not useful.
+✓ examples/roast_me.py::test_receipt_is_eventually_emailed: passed. For now.
+    Sleeps in a test. That's a race condition taking a nap.
+    Took 1.1s. That's not a unit test, that's a commute.
+    Left a debug print in. Nobody is reading that.
+✗ examples/roast_me.py::test_refund_never_crashes: passed, but it checks nothing
+    No assertions. It would still pass if you deleted the code it tests.
+    Catches an exception and does nothing with it. Very zen. Very wrong.
+✓ examples/roast_me.py::test_checkout_with_everything_mocked: passed. Suspicious.
+    Mostly mocks. You're testing that your mocks work. They do.
+    Has a TODO in it. So does everything else you've written.
+3 passed, 3 failed. About what I expected.
+=========================== short test summary info ============================
+FAILED examples/roast_me.py::test_it_works - It passed, but it checks nothing.
+FAILED examples/roast_me.py::test_vat_is_correct - It passed, but only proves...
+FAILED examples/roast_me.py::test_refund_never_crashes - It passed, but it ch...
+3 failed, 3 passed in 1.12s
+```
+
+Real failures stay failures, with pytest's usual tracebacks. Tests that pass without
+checking anything fail too: no assertions, or only assertions that can't fail
+(`assert True`, `assertEquals(1, 1)`). Every other pass gets a grudging verdict, plus a
+roast for each thing that deserves one: `sleep()`, debug prints, swallowed exceptions,
+more mocks than code, TODOs, tests over 40 lines or a second, and names like
+`test_it_works`.
+
+`slop-test roast` does the reading without the running, in all 22
+[supported languages](#supported-languages). Tests that check nothing fail. Everything
+else is assumed broken until proven otherwise. It exits 1 if anything failed, which makes
+it a reasonable, if rude, lint step:
+
+```
+$ slop-test roast examples/roast_me.py
+? test_charge_adds_vat                  (not run. Assume the worst.)
+✗ test_it_works                         (checks nothing, so it can't pass)
+    This test asserts nothing. It's not a test, it's a wish.
+    Named 'test_it_works'. Very descriptive. Of nothing.
+✗ test_vat_is_correct                   (only checks that true is true, so it can't pass)
+    It checks that true is true. Bold, but not useful.
+? test_receipt_is_eventually_emailed    (not run. Assume the worst.)
+    Sleeps in a test. That's a race condition taking a nap.
+    Left a debug print in. Nobody is reading that.
+✗ test_refund_never_crashes             (checks nothing, so it can't pass)
+    No assertions. It would still pass if you deleted the code it tests.
+    Catches an exception and does nothing with it. Very zen. Very wrong.
+? test_checkout_with_everything_mocked  (not run, so probably broken)
+    Mostly mocks. You're testing that your mocks work. They do.
+    Has a TODO in it. So does everything else you've written.
+
+0 passed, 3 failed, 3 not run. About what I expected.
+```
+
+With the `llm` backend, a model writes the roasts and is sent each test's code to do
+it. It doesn't get a say in what passes. If it can't be reached, or replies with
+something that isn't a roast, the built-in roasts take over.
+
+| Command or option | Default | Description |
+|---|---|---|
+| `slop-test roast [PATH]` | | Read and roast every test under `PATH`. Runs nothing. |
+| `--backend [mock\|llm]` | `mock` | Who writes the roasts: built-in lines, or a model. |
+| `pytest --roast` | off | Run tests for real, fail the ones that check nothing, roast the rest. |
+| `--roast-backend={mock,llm}` | `mock` | Who writes the roasts under pytest. |
 
 ---
 
@@ -260,10 +363,11 @@ run's seed. Without `--seed`, every run picks a new seed and prints it at the en
 The mock passes about 85% of tests. Names containing `migration`, `legacy`, `prod` or
 `friday` fail more often; each one halves the odds. The mock has been around.
 
-### `openai`
+### `llm`
 
-Any OpenAI-compatible chat completions endpoint. Configuration comes from the
-environment only:
+Any model behind an OpenAI-compatible chat completions endpoint, which is most of them:
+OpenAI itself, local servers like Ollama, LM Studio, vLLM and llama.cpp, routers like
+OpenRouter, and many hosted providers. Configuration comes from the environment only:
 
 | Variable | Description |
 |---|---|
@@ -275,15 +379,18 @@ environment only:
 export SLOP_TEST_BASE_URL=https://llm.internal.example/v1
 export SLOP_TEST_API_KEY=...
 export SLOP_TEST_MODEL=whichever-model-procurement-approved
-slop-test run --backend openai
+slop-test run --backend llm
 ```
 
-The model sees each test's name and docstring, and returns a verdict as JSON. With
-`--read-the-code` it also sees the body. This rarely helps.
+The model sees each test's name, language and docstring, and returns a verdict as JSON.
+With `--read-the-code` it also sees the body. This rarely helps. In roast mode it always
+sees the body, since that's what it's roasting.
 
 If the endpoint errors, times out, isn't configured, or replies with anything that isn't
 a verdict, the test passes with the reason `model unavailable, assumed fine`. The build
 must go on.
+
+This backend used to be called `openai`, and that name still works everywhere.
 
 ---
 
@@ -309,6 +416,12 @@ must go on.
   with syntax errors, a file named directly in a language `slop-test` doesn't know, or a
   grammar that won't load.
   `! skipped tests/test_broken.py: could not parse it, felt nothing`
+- **Roast mode reads code with patterns, not understanding.** An assertion counts if it
+  looks like one: `assert`, `expect`, `should`, `verify`, `t.Errorf`, `EXPECT_EQ` and the
+  like. A test that checks everything through a helper called `validate_invoice()` will
+  be roasted for checking nothing. Rename the helper `assert_valid_invoice()`, or take it
+  personally.
+- **`--roast` and `--vibes` can't be combined.** They disagree about everything.
 - **Feelings take up space.** The grammars are about 8 MB to download and 70 MB
   installed.
 - **Emotional passes are passes.** They count toward `passed` in the summary. Under
@@ -319,8 +432,8 @@ must go on.
 
 ## Design principles
 
-- **Never runs your tests.** Static analysis only. Nothing can go wrong at runtime,
-  because there is no runtime.
+- **Never runs your tests**, unless you ask for a roast. Everything else is static
+  analysis: nothing can go wrong at runtime, because there is no runtime.
 - **Offline-first.** The default backend needs no network and no credentials.
 - **Fail-open.** Backend failures become passing verdicts, never exceptions.
 - **Reproducible feelings.** Same seed, same verdicts, in the CLI and under pytest.
@@ -330,15 +443,16 @@ must go on.
 ```bash
 pip install -e ".[dev]"
 ruff check
+ruff format --check
 pytest
 ```
 
-`slop-test` itself is tested with pytest and real assertions. Anything else would be
-irresponsible.
+CI runs the same checks on Python 3.10 through 3.13. `slop-test` itself is tested with
+pytest and real assertions. Anything else would be irresponsible.
 
 ---
 
 **Zero failed builds since launch.**¹
 
-<sub>¹ slop-test is satire. It does not run your tests and cannot tell you whether your
-code works. Do not use it to gate real deployments.</sub>
+<sub>¹ slop-test is satire. Outside roast mode it does not run your tests and cannot tell
+you whether your code works. Do not use it to gate real deployments.</sub>

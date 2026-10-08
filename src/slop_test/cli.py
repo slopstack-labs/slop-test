@@ -8,11 +8,13 @@ import typer
 from rich.console import Console
 
 from slop_test import __version__
-from slop_test.backends import get_backend
+from slop_test.backends import get_backend, resolve
 from slop_test.backends.mock import random_seed
-from slop_test.discovery import discover
+from slop_test.backends.openai_compat import OpenAICompatBackend
+from slop_test.discovery import DiscoveredTest, discover
 from slop_test.judge import judge
 from slop_test.report import Reporter
+from slop_test.roast import roast
 
 app = typer.Typer(
     add_completion=False,
@@ -26,7 +28,18 @@ DEFAULT_PATH = Path("tests")
 
 class BackendName(str, Enum):
     mock = "mock"
-    openai = "openai"
+    llm = "llm"
+    openai = "openai"  # the llm backend's old name
+
+
+PathArgument = Annotated[
+    Path | None,
+    typer.Argument(
+        exists=True,
+        metavar="PATH",
+        help="Test file or directory. Default: tests/ if it exists, else here.",
+    ),
+]
 
 
 def _print_version(value: bool) -> None:
@@ -52,17 +65,13 @@ def main(
 
 @app.command()
 def run(
-    path: Annotated[
-        Path | None,
-        typer.Argument(
-            exists=True,
-            metavar="PATH",
-            help="Test file or directory to feel out. Default: tests/ if it exists, else here.",
-        ),
-    ] = None,
+    path: PathArgument = None,
     backend_name: Annotated[
         BackendName,
-        typer.Option("--backend", help="Who decides how your tests feel."),
+        typer.Option(
+            "--backend",
+            help="Who decides how your tests feel. openai is an old name for llm.",
+        ),
     ] = BackendName.mock,
     retries: Annotated[
         int,
@@ -93,20 +102,14 @@ def run(
     Vibe coverage is the mean confidence of every test that did not fail.
     It has no relation to line coverage.
 
-    --backend openai reads SLOP_TEST_BASE_URL, SLOP_TEST_API_KEY and SLOP_TEST_MODEL
-    from the environment.
+    --backend llm talks to any OpenAI-compatible endpoint, configured with
+    SLOP_TEST_BASE_URL, SLOP_TEST_API_KEY and SLOP_TEST_MODEL.
 
     Exits 0, always, unless --honest-exit-codes is set.
     """
-    if path is None:
-        path = DEFAULT_PATH if DEFAULT_PATH.is_dir() else Path(".")
     console = Console(highlight=False, soft_wrap=True)
-    discovery = discover(path)
-    reporter = Reporter(console, discovery.tests)
-    for file in discovery.unparsable:
-        reporter.unparsable(file)
-    if not discovery.tests:
-        console.print(f"No tests found in {path}. Nothing to feel.")
+    tests, reporter = _discover(path, console, verb="feel")
+    if not tests:
         return
 
     # Only the mock has feelings worth reproducing.
@@ -115,7 +118,7 @@ def run(
         seed = random_seed()
     backend = get_backend(backend_name.value, seed=seed, read_the_code=read_the_code)
     verdicts = []
-    for test in discovery.tests:
+    for test in tests:
         reporter.starting(test)
         verdict = judge(test, backend, retries=retries, strict=strict, on_retry=reporter.retrying)
         reporter.result(test, verdict)
@@ -126,3 +129,58 @@ def run(
 
     if honest_exit_codes and any(v.failed for v in verdicts):
         raise typer.Exit(1)
+
+
+@app.command("roast")
+def roast_command(
+    path: PathArgument = None,
+    backend_name: Annotated[
+        BackendName,
+        typer.Option(
+            "--backend",
+            help="Who writes the roasts: built-in lines, or a model. openai = llm.",
+        ),
+    ] = BackendName.mock,
+) -> None:
+    """Read every test under PATH and say what's wrong with it. Nothing is run.
+
+    Tests that don't check anything fail. Everything else is assumed broken until
+    proven otherwise. To prove it, run Python tests with pytest --roast.
+
+    --backend llm sends each test's code to SLOP_TEST_BASE_URL.
+
+    Exits 1 if any test failed.
+    """
+    console = Console(highlight=False, soft_wrap=True)
+    tests, reporter = _discover(path, console, verb="roast")
+    if not tests:
+        return
+
+    model = None
+    if resolve(backend_name.value) == "llm":
+        model = OpenAICompatBackend.from_env(read_the_code=True)
+    results = []
+    for test in tests:
+        reporter.starting(test)
+        result = roast(test, model=model)
+        reporter.roasted(test, result)
+        results.append(result)
+    reporter.roast_summary(results)
+
+    if any(r.status == "failed" for r in results):
+        raise typer.Exit(1)
+
+
+def _discover(
+    path: Path | None, console: Console, *, verb: str
+) -> tuple[list[DiscoveredTest], Reporter]:
+    """Find the tests under `path`, and say so when some can't be read or there are none."""
+    if path is None:
+        path = DEFAULT_PATH if DEFAULT_PATH.is_dir() else Path(".")
+    discovery = discover(path)
+    reporter = Reporter(console, discovery.tests)
+    for file in discovery.unparsable:
+        reporter.unparsable(file)
+    if not discovery.tests:
+        console.print(f"No tests found in {path}. Nothing to {verb}.")
+    return discovery.tests, reporter

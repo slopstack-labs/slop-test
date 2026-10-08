@@ -8,6 +8,7 @@ from fakes import ScriptedBackend
 from slop_test.backends.mock import MockBackend
 from slop_test.discovery import discover
 from slop_test.judge import judge
+from slop_test.roast import ROASTS
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 WORDS = {"passed": "PASSED", "passed_emotionally": "PASSED EMOTIONALLY", "failed": "FAILED"}
@@ -147,11 +148,11 @@ def test_vibes_options_reach_the_backend(pytester, scripted):
         "--vibes-strict",
         "--vibes-retries=1",
         "--vibes-seed=5",
-        "--vibes-backend=openai",
+        "--vibes-backend=llm",
         "--vibes-read-the-code",
     )
 
-    assert backend.requested == ("openai", {"seed": 5, "read_the_code": True})
+    assert backend.requested == ("llm", {"seed": 5, "read_the_code": True})
     assert backend.judge_calls["test_really_fails"] == 2
     assert set(backend.sure_calls.values()) == {1}
     assert len(backend.sure_calls) == 4
@@ -200,3 +201,113 @@ def test_vibes_agree_with_slop_test_run(pytester):
             for qualname, status in expected.items()
         ]
     )
+
+
+ROAST_SUITE = """
+import pytest
+
+
+@pytest.fixture
+def broken():
+    raise RuntimeError("fixture exploded")
+
+
+def test_really_fails():
+    assert 1 + 1 == 3
+
+
+def test_checks_nothing():
+    sum([1, 2])
+
+
+def test_vat_is_correct():
+    assert True
+
+
+def test_genuinely_fine():
+    assert sum([1, 2]) == 3
+
+
+@pytest.mark.skip(reason="later")
+def test_skipped():
+    assert sum([1, 2]) == 3
+
+
+def test_setup_explodes(broken):
+    assert broken
+"""
+
+
+def test_roast_runs_tests_for_real_and_fails_the_weak_ones(pytester):
+    pytester.makepyfile(ROAST_SUITE)
+
+    result = pytester.runpytest("--roast")
+
+    result.assert_outcomes(passed=1, failed=3, skipped=1, errors=1)
+    result.stdout.fnmatch_lines(
+        [
+            "*assert (1 + 1) == 3*",
+            "*_ test_checks_nothing _*",
+            "It passed, but it checks nothing.",
+            "*_ test_vat_is_correct _*",
+            "It passed, but only proves that true is true.",
+            "*= roast =*",
+            "✗ *::test_really_fails: failed*",
+            "✗ *::test_checks_nothing: passed, but it checks nothing",
+            "✗ *::test_vat_is_correct: passed, but only proves that true is true",
+            "✓ *::test_genuinely_fine: passed*",
+            "- *::test_skipped: skipped*",
+            "✗ *::test_setup_explodes: failed*",
+            "1 passed, 4 failed, 1 skipped. About what I expected.",
+        ]
+    )
+    assert result.ret == pytest.ExitCode.TESTS_FAILED
+
+
+def test_roast_only_passes_honest_suites(pytester):
+    pytester.makepyfile("def test_fine():\n    assert sum([1, 2]) == 3\n")
+
+    result = pytester.runpytest("--roast")
+
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines(["1 passed, 0 failed. Everything passed. I don't trust it."])
+    assert result.ret == pytest.ExitCode.OK
+
+
+def test_roast_mentions_slow_tests(pytester, monkeypatch):
+    monkeypatch.setattr("slop_test.roast.SLOW_TEST_SECONDS", 0.0)
+    pytester.makepyfile("def test_fine():\n    assert sum([1, 2]) == 3\n")
+
+    result = pytester.runpytest("--roast")
+
+    assert "Took 0.0s" in result.stdout.str()
+
+
+@pytest.mark.parametrize("name", ["llm", "openai"])
+def test_roast_with_an_unconfigured_model_uses_built_in_roasts(pytester, monkeypatch, name):
+    monkeypatch.delenv("SLOP_TEST_BASE_URL", raising=False)
+    monkeypatch.delenv("SLOP_TEST_MODEL", raising=False)
+    pytester.makepyfile("def test_checks_nothing():\n    sum([1, 2])\n")
+
+    result = pytester.runpytest("--roast", f"--roast-backend={name}")
+
+    result.assert_outcomes(failed=1)
+    assert any(line in result.stdout.str() for line in ROASTS["no_assertions"])
+
+
+def test_vibes_and_roast_cannot_both_be_on(pytester):
+    pytester.makepyfile("def test_fine():\n    assert True\n")
+
+    result = pytester.runpytest("--vibes", "--roast")
+
+    assert result.ret == pytest.ExitCode.USAGE_ERROR
+    result.stderr.fnmatch_lines(["*--vibes and --roast disagree about everything*"])
+
+
+def test_without_roast_weak_tests_pass_as_usual(pytester):
+    pytester.makepyfile("def test_vat_is_correct():\n    assert True\n")
+
+    result = pytester.runpytest()
+
+    result.assert_outcomes(passed=1)
+    assert "= roast =" not in result.stdout.str()

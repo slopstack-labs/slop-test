@@ -42,6 +42,7 @@ def make_test(
     docstring: str | None = None,
     source: str = "",
     file: Path = Path("tests/test_fake.py"),
+    language: str = "Python",
 ) -> DiscoveredTest:
     return DiscoveredTest(
         file=file,
@@ -49,4 +50,5 @@ def make_test(
         source=source or f"def {name}():\n    pass\n",
         docstring=docstring,
         class_path=class_path,
+        language=language,
     )
