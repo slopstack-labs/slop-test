@@ -12,9 +12,13 @@ README = Path(__file__).parent.parent / "README.md"
 WIDTH = "100"
 
 
+# Colors, which typer turns on by itself on GitHub Actions.
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
 def cli_help(*args: str) -> str:
     runner = CliRunner(env={"COLUMNS": WIDTH, "FORCE_COLOR": None, "TTY_COMPATIBLE": None})
-    output = runner.invoke(app, [*args, "--help"]).output
+    output = ANSI.sub("", runner.invoke(app, [*args, "--help"], prog_name="slop-test").output)
     return "\n".join(line.rstrip() for line in output.splitlines()).strip("\n")
 
 

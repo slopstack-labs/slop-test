@@ -563,7 +563,7 @@ output.
 
 ```
 $ slop-test --help
- Usage: root [OPTIONS] COMMAND [ARGS]...
+ Usage: slop-test [OPTIONS] COMMAND [ARGS]...
 
  Assertion-free testing. Your tests pass when they feel like they passed.
 
@@ -582,7 +582,7 @@ $ slop-test --help
 
 ```
 $ slop-test run --help
- Usage: root run [OPTIONS] [PATH]
+ Usage: slop-test run [OPTIONS] [PATH]
 
  Judge every test under PATH by how it feels. No test code is imported or run.
 
@@ -652,7 +652,7 @@ $ slop-test run --help
 
 ```
 $ slop-test roast --help
- Usage: root roast [OPTIONS] [PATH]
+ Usage: slop-test roast [OPTIONS] [PATH]
 
  Read every test under PATH and say what's wrong with it. Nothing is run.
 
