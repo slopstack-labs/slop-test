@@ -148,11 +148,11 @@ def test_vibes_options_reach_the_backend(pytester, scripted):
         "--vibes-strict",
         "--vibes-retries=1",
         "--vibes-seed=5",
-        "--vibes-backend=openai",
+        "--vibes-backend=llm",
         "--vibes-read-the-code",
     )
 
-    assert backend.requested == ("openai", {"seed": 5, "read_the_code": True})
+    assert backend.requested == ("llm", {"seed": 5, "read_the_code": True})
     assert backend.judge_calls["test_really_fails"] == 2
     assert set(backend.sure_calls.values()) == {1}
     assert len(backend.sure_calls) == 4
@@ -283,12 +283,13 @@ def test_roast_mentions_slow_tests(pytester, monkeypatch):
     assert "Took 0.0s" in result.stdout.str()
 
 
-def test_roast_with_an_unconfigured_model_uses_built_in_roasts(pytester, monkeypatch):
+@pytest.mark.parametrize("name", ["llm", "openai"])
+def test_roast_with_an_unconfigured_model_uses_built_in_roasts(pytester, monkeypatch, name):
     monkeypatch.delenv("SLOP_TEST_BASE_URL", raising=False)
     monkeypatch.delenv("SLOP_TEST_MODEL", raising=False)
     pytester.makepyfile("def test_checks_nothing():\n    sum([1, 2])\n")
 
-    result = pytester.runpytest("--roast", "--roast-backend=openai")
+    result = pytester.runpytest("--roast", f"--roast-backend={name}")
 
     result.assert_outcomes(failed=1)
     assert any(line in result.stdout.str() for line in ROASTS["no_assertions"])

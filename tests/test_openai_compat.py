@@ -200,11 +200,12 @@ def test_from_env():
     assert backend.read_the_code is True
 
 
-def test_get_backend_reads_the_environment(monkeypatch):
+@pytest.mark.parametrize("name", ["llm", "openai"], ids=["name", "old-name"])
+def test_get_backend_reads_the_environment(monkeypatch, name):
     monkeypatch.setenv("SLOP_TEST_BASE_URL", "https://llm.test/v1")
     monkeypatch.setenv("SLOP_TEST_MODEL", "test-model")
 
-    backend = get_backend("openai", read_the_code=True)
+    backend = get_backend(name, read_the_code=True)
 
     assert isinstance(backend, OpenAICompatBackend)
     assert backend.model == "test-model"

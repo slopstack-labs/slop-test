@@ -238,6 +238,6 @@ def test_cli_roast_with_an_unconfigured_model_uses_built_in_roasts(suite, monkey
     monkeypatch.delenv("SLOP_TEST_BASE_URL", raising=False)
     monkeypatch.delenv("SLOP_TEST_MODEL", raising=False)
 
-    with_model = runner.invoke(app, ["roast", str(suite), "--backend", "openai"])
+    with_model = runner.invoke(app, ["roast", str(suite), "--backend", "llm"])
 
     assert with_model.output == runner.invoke(app, ["roast", str(suite)]).output

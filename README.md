@@ -153,7 +153,7 @@ run covers more than one file, each file's results come under a heading with its
 
 | Option | Default | Description |
 |---|---|---|
-| `--backend [mock\|openai]` | `mock` | Who decides how your tests feel. |
+| `--backend [mock\|llm]` | `mock` | Who decides how your tests feel. |
 | `--retries INT` | `3` | Empathetic retries for each failed test. |
 | `--strict` | off | Ask the backend "Are you sure?" once per test. |
 | `--seed INT` | random | Seed for the mock backend's feelings. |
@@ -197,7 +197,7 @@ feelings.
 | Option | Default | Description |
 |---|---|---|
 | `--vibes` | off | Replace each test's real outcome with how it feels. |
-| `--vibes-backend={mock,openai}` | `mock` | Who decides how your tests feel. |
+| `--vibes-backend={mock,llm}` | `mock` | Who decides how your tests feel. |
 | `--vibes-retries=N` | `3` | Empathetic retries for each failed test. |
 | `--vibes-strict` | off | Ask the backend "Are you sure?" once per test. |
 | `--vibes-seed=N` | random | Seed for the mock backend's feelings. |
@@ -245,7 +245,7 @@ $ slop-test run tests/fixtures/polyglot/js --seed 0
 | F# | `*Test.fs`, `*Tests.fs`, anything in a test directory | `[<Fact>]`, `[<Test>]` and friends; Expecto `testCase` inside `testList` |
 
 A test directory is one named `test`, `tests`, `spec`, `specs` or `__tests__`. Doc
-comments right above a test count as its docstring, which is what the `openai` backend
+comments right above a test count as its docstring, which is what the `llm` backend
 reads.
 
 ---
@@ -319,16 +319,16 @@ $ slop-test roast examples/roast_me.py
 0 passed, 3 failed, 3 not run. About what I expected.
 ```
 
-With the `openai` backend, a model writes the roasts and is sent each test's code to do
+With the `llm` backend, a model writes the roasts and is sent each test's code to do
 it. It doesn't get a say in what passes. If it can't be reached, or replies with
 something that isn't a roast, the built-in roasts take over.
 
 | Command or option | Default | Description |
 |---|---|---|
 | `slop-test roast [PATH]` | | Read and roast every test under `PATH`. Runs nothing. |
-| `--backend [mock\|openai]` | `mock` | Who writes the roasts: built-in lines, or a model. |
+| `--backend [mock\|llm]` | `mock` | Who writes the roasts: built-in lines, or a model. |
 | `pytest --roast` | off | Run tests for real, fail the ones that check nothing, roast the rest. |
-| `--roast-backend={mock,openai}` | `mock` | Who writes the roasts under pytest. |
+| `--roast-backend={mock,llm}` | `mock` | Who writes the roasts under pytest. |
 
 ---
 
@@ -343,10 +343,11 @@ run's seed. Without `--seed`, every run picks a new seed and prints it at the en
 The mock passes about 85% of tests. Names containing `migration`, `legacy`, `prod` or
 `friday` fail more often; each one halves the odds. The mock has been around.
 
-### `openai`
+### `llm`
 
-Any OpenAI-compatible chat completions endpoint. Configuration comes from the
-environment only:
+Any model behind an OpenAI-compatible chat completions endpoint, which is most of them:
+OpenAI itself, local servers like Ollama, LM Studio, vLLM and llama.cpp, routers like
+OpenRouter, and many hosted providers. Configuration comes from the environment only:
 
 | Variable | Description |
 |---|---|
@@ -358,7 +359,7 @@ environment only:
 export SLOP_TEST_BASE_URL=https://llm.internal.example/v1
 export SLOP_TEST_API_KEY=...
 export SLOP_TEST_MODEL=whichever-model-procurement-approved
-slop-test run --backend openai
+slop-test run --backend llm
 ```
 
 The model sees each test's name and docstring, and returns a verdict as JSON. With
@@ -367,6 +368,8 @@ The model sees each test's name and docstring, and returns a verdict as JSON. Wi
 If the endpoint errors, times out, isn't configured, or replies with anything that isn't
 a verdict, the test passes with the reason `model unavailable, assumed fine`. The build
 must go on.
+
+This backend used to be called `openai`, and that name still works everywhere.
 
 ---
 

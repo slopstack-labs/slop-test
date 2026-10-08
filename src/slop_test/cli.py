@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 
 from slop_test import __version__
-from slop_test.backends import get_backend
+from slop_test.backends import get_backend, resolve
 from slop_test.backends.mock import random_seed
 from slop_test.backends.openai_compat import OpenAICompatBackend
 from slop_test.discovery import DiscoveredTest, discover
@@ -28,7 +28,8 @@ DEFAULT_PATH = Path("tests")
 
 class BackendName(str, Enum):
     mock = "mock"
-    openai = "openai"
+    llm = "llm"
+    openai = "openai"  # the llm backend's old name
 
 
 PathArgument = Annotated[
@@ -67,7 +68,10 @@ def run(
     path: PathArgument = None,
     backend_name: Annotated[
         BackendName,
-        typer.Option("--backend", help="Who decides how your tests feel."),
+        typer.Option(
+            "--backend",
+            help="Who decides how your tests feel. openai is an old name for llm.",
+        ),
     ] = BackendName.mock,
     retries: Annotated[
         int,
@@ -98,8 +102,8 @@ def run(
     Vibe coverage is the mean confidence of every test that did not fail.
     It has no relation to line coverage.
 
-    --backend openai reads SLOP_TEST_BASE_URL, SLOP_TEST_API_KEY and SLOP_TEST_MODEL
-    from the environment.
+    --backend llm talks to any OpenAI-compatible endpoint, configured with
+    SLOP_TEST_BASE_URL, SLOP_TEST_API_KEY and SLOP_TEST_MODEL.
 
     Exits 0, always, unless --honest-exit-codes is set.
     """
@@ -132,7 +136,10 @@ def roast_command(
     path: PathArgument = None,
     backend_name: Annotated[
         BackendName,
-        typer.Option("--backend", help="Who writes the roasts: built-in lines, or a model."),
+        typer.Option(
+            "--backend",
+            help="Who writes the roasts: built-in lines, or a model. openai = llm.",
+        ),
     ] = BackendName.mock,
 ) -> None:
     """Read every test under PATH and say what's wrong with it. Nothing is run.
@@ -140,7 +147,7 @@ def roast_command(
     Tests that don't check anything fail. Everything else is assumed broken until
     proven otherwise. To prove it, run Python tests with pytest --roast.
 
-    --backend openai sends each test's code to SLOP_TEST_BASE_URL.
+    --backend llm sends each test's code to SLOP_TEST_BASE_URL.
 
     Exits 1 if any test failed.
     """
@@ -150,7 +157,7 @@ def roast_command(
         return
 
     model = None
-    if backend_name is BackendName.openai:
+    if resolve(backend_name.value) == "llm":
         model = OpenAICompatBackend.from_env(read_the_code=True)
     results = []
     for test in tests:

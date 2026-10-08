@@ -177,19 +177,20 @@ def test_options_reach_the_backend(suite, scripted):
 def test_read_the_code_reaches_the_backend(suite, scripted):
     backend = scripted()
 
-    invoke("run", suite, "--backend", "openai", "--read-the-code")
+    invoke("run", suite, "--backend", "llm", "--read-the-code")
 
     name, options = backend.requested
-    assert name == "openai"
+    assert name == "llm"
     assert options["read_the_code"] is True
 
 
-def test_unconfigured_openai_backend_assumes_everything_is_fine(suite, monkeypatch):
+@pytest.mark.parametrize("name", ["llm", "openai"])
+def test_unconfigured_llm_backend_assumes_everything_is_fine(suite, monkeypatch, name):
     monkeypatch.delenv("SLOP_TEST_BASE_URL", raising=False)
     monkeypatch.delenv("SLOP_TEST_MODEL", raising=False)
     monkeypatch.setenv("SLOP_TEST_API_KEY", "sk-cli-do-not-print-me")
 
-    result = invoke("run", suite, "--backend", "openai", "--strict", "--honest-exit-codes")
+    result = invoke("run", suite, "--backend", name, "--strict", "--honest-exit-codes")
 
     assert result.exit_code == 0
     assert result.output.count("(model unavailable, assumed fine)") == 3

@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from slop_test import roast
-from slop_test.backends import BACKEND_NAMES, get_backend
+from slop_test.backends import ALIASES, BACKEND_NAMES, get_backend, resolve
 from slop_test.backends.mock import random_seed
 from slop_test.backends.openai_compat import OpenAICompatBackend
 from slop_test.discovery import DiscoveredTest
@@ -33,9 +33,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     group.addoption(
         "--vibes-backend",
-        choices=BACKEND_NAMES,
+        choices=(*BACKEND_NAMES, *ALIASES),
         default="mock",
-        help="Who decides how your tests feel. Default: mock.",
+        help="Who decides how your tests feel. openai is an old name for llm. Default: mock.",
     )
     group.addoption(
         "--vibes-retries",
@@ -68,9 +68,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     group.addoption(
         "--roast-backend",
-        choices=BACKEND_NAMES,
+        choices=(*BACKEND_NAMES, *ALIASES),
         default="mock",
-        help="Who writes the roasts: built-in lines (mock) or a model (openai). Default: mock.",
+        help="Who writes the roasts: built-in lines (mock) or a model (llm). Default: mock.",
     )
 
 
@@ -146,7 +146,7 @@ class VibesPlugin:
 class RoastPlugin:
     def __init__(self, config: pytest.Config) -> None:
         self.model = None
-        if config.getoption("roast_backend") == "openai":
+        if resolve(config.getoption("roast_backend")) == "llm":
             self.model = OpenAICompatBackend.from_env(read_the_code=True)
         self.results: dict[str, roast.Roast] = {}
 
