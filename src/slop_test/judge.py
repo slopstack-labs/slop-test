@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Literal
+
+from slop_test.discovery import DiscoveredTest
+
+if TYPE_CHECKING:
+    from slop_test.backends import Backend
 
 Status = Literal["passed", "passed_emotionally", "failed"]
 STATUSES: tuple[Status, ...] = ("passed", "passed_emotionally", "failed")
+EMOTIONAL_REASON = "passed, emotionally"
+
+RetryHook = Callable[[DiscoveredTest, int], None]
 
 
 @dataclass(frozen=True)
@@ -18,3 +27,31 @@ class Verdict:
     @property
     def failed(self) -> bool:
         return self.status == "failed"
+
+
+def judge(
+    test: DiscoveredTest,
+    backend: Backend,
+    *,
+    retries: int = 3,
+    strict: bool = False,
+    on_retry: RetryHook | None = None,
+) -> Verdict:
+    """Ask `backend` how `test` feels.
+
+    A failed verdict is retried up to `retries` times, calling `on_retry(test, attempt)`
+    before each one. A test that comes around on a retry passed emotionally. With `strict`,
+    the backend is asked "Are you sure?" exactly once, and its answer is final.
+    """
+    verdict = backend.judge(test)
+    attempt = 0
+    while verdict.failed and attempt < retries:
+        attempt += 1
+        if on_retry is not None:
+            on_retry(test, attempt)
+        verdict = backend.judge(test)
+        if not verdict.failed:
+            verdict = replace(verdict, status="passed_emotionally", reason=EMOTIONAL_REASON)
+    if strict:
+        verdict = backend.are_you_sure(test, verdict)
+    return verdict
