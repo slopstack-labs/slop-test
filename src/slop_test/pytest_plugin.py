@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from slop_test import personas, roast
-from slop_test.backends import ALIASES, BACKEND_NAMES, get_bench, resolve
+from slop_test.backends import ALIASES, BACKEND_NAMES, choose, get_bench
 from slop_test.backends.mock import random_seed
 from slop_test.backends.openai_compat import OpenAICompatBackend
 from slop_test.discovery import DiscoveredTest
@@ -41,8 +41,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         choices=(*BACKEND_NAMES, *ALIASES),
         default="llm",
         help="Who judges under --vibes. mock: an offline coin flip with stock reasons. llm: a "
-        "model, set up with the SLOP_TEST_* variables (see slop-test run --help). openai is "
-        "an old name for llm. Default: llm.",
+        "model, set up with the SLOP_TEST_* variables (see slop-test run --help), or the mock "
+        "until one is. openai is an old name for llm. Default: llm.",
     )
     group.addoption(
         "--vibes-retries",
@@ -95,8 +95,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--roast-backend",
         choices=(*BACKEND_NAMES, *ALIASES),
         default="llm",
-        help="Who writes the roasts under --roast: built-in lines (mock) or a model (llm). "
-        "Pass/fail doesn't depend on it. Default: llm.",
+        help="Who writes the roasts under --roast: built-in lines (mock) or a model (llm), "
+        "with the built-in lines until a model is set up. Pass/fail doesn't depend on it. "
+        "Default: llm.",
     )
     group.addoption(
         "--roast-persona",
@@ -127,7 +128,7 @@ class VibesPlugin:
         backend_name = config.getoption("vibes_backend")
         seed = config.getoption("vibes_seed")
         # Only the mock has feelings worth reproducing.
-        self.show_seed = seed is None and backend_name == "mock"
+        self.show_seed = seed is None and choose(backend_name) == "mock"
         self.seed: int = random_seed() if seed is None else seed
         jury = config.getoption("vibes_jury")
         if not 1 <= jury <= len(personas.PERSONAS):
@@ -205,7 +206,7 @@ class VibesPlugin:
 class RoastPlugin:
     def __init__(self, config: pytest.Config) -> None:
         self.model = None
-        if resolve(config.getoption("roast_backend")) == "llm":
+        if choose(config.getoption("roast_backend")) == "llm":
             persona = personas.pick(config.getoption("roast_persona"), random.Random())
             self.model = OpenAICompatBackend.from_env(read_the_code=True, persona=persona)
         self.narrator = Narrator(self.model)

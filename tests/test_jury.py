@@ -113,6 +113,16 @@ def test_a_mock_jury_gives_each_juror_their_own_seed():
     assert bench.narrated
 
 
+def test_an_llm_bench_without_a_model_set_up_is_the_mock(monkeypatch):
+    monkeypatch.setenv("SLOP_TEST_BASE_URL", "https://llm.test/v1")  # but no model
+
+    bench = get_bench("llm", seed=7, jury=3)
+
+    assert [j.backend.seed for j in bench.backend.jurors] == [7, 8, 9]
+    assert bench.personas == get_bench("mock", seed=7, jury=3).personas
+    assert bench.model is None
+
+
 def test_an_llm_bench_gives_every_juror_a_persona(monkeypatch):
     monkeypatch.setenv("SLOP_TEST_BASE_URL", "https://llm.test/v1")
     monkeypatch.setenv("SLOP_TEST_MODEL", "m")

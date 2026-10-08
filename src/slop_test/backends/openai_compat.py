@@ -86,6 +86,13 @@ Message = dict[str, str]
 T = TypeVar("T")
 
 
+def configured(env: Mapping[str, str] | None = None) -> bool:
+    """Whether the environment says which model to ask: SLOP_TEST_BASE_URL and
+    SLOP_TEST_MODEL are both set."""
+    env = os.environ if env is None else env
+    return bool(env.get("SLOP_TEST_BASE_URL") and env.get("SLOP_TEST_MODEL"))
+
+
 @dataclass(frozen=True)
 class ModelRoast:
     headline: str | None

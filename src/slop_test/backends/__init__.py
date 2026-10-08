@@ -45,6 +45,15 @@ def resolve(name: str) -> str:
     return ALIASES.get(name, name)
 
 
+def choose(name: str) -> str:
+    """The backend that actually judges: `name`, unless it's a model nobody has set up,
+    in which case the mock stands in."""
+    from slop_test.backends.openai_compat import configured
+
+    name = resolve(name)
+    return "mock" if name == "llm" and not configured() else name
+
+
 def get_backend(
     name: str, *, seed: int = 0, read_the_code: bool = False, persona: str = personas.RANDOM
 ) -> Backend:
@@ -65,7 +74,7 @@ def get_bench(
     from slop_test.backends.mock import MockBackend
     from slop_test.backends.openai_compat import OpenAICompatBackend
 
-    name = resolve(name)
+    name = choose(name)
     panel = personas.panel(jury, persona, random.Random(seed))
     model = None
     if name == "mock":

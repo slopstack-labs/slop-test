@@ -184,18 +184,18 @@ def test_read_the_code_reaches_the_backend(suite, scripted):
     assert options["read_the_code"] is True
 
 
-@pytest.mark.parametrize("name", ["llm", "openai"])
-def test_unconfigured_llm_backend_assumes_everything_is_fine(suite, monkeypatch, name):
-    monkeypatch.delenv("SLOP_TEST_BASE_URL", raising=False)
-    monkeypatch.delenv("SLOP_TEST_MODEL", raising=False)
+@pytest.mark.parametrize(
+    "args", [[], ["--backend", "llm"], ["--backend", "openai"]], ids=["default", "llm", "openai"]
+)
+def test_without_a_model_set_up_the_mock_judges(suite, monkeypatch, args):
     monkeypatch.setenv("SLOP_TEST_API_KEY", "sk-cli-do-not-print-me")
+    monkeypatch.setattr("slop_test.cli.random_seed", lambda: 11)
 
-    result = invoke("run", suite, "--backend", name, "--strict", "--honest-exit-codes")
+    result = invoke("run", suite, *args, "--strict")
 
-    assert result.exit_code == 0
-    assert result.output.count("(model unavailable, assumed fine)") == 3
+    assert result.output == invoke("run", suite, "--backend", "mock", "--strict").output
+    assert result.output.endswith("\nTo feel this way again: --seed 11\n")
     assert "sk-cli-do-not-print-me" not in result.output
-    assert "To feel this way again" not in result.output  # the model has no seed to repeat
 
 
 def test_help_disclaims_line_coverage():

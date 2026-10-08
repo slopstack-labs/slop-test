@@ -5,7 +5,7 @@ import httpx
 import pytest
 from fakes import make_test
 
-from slop_test.backends import get_backend
+from slop_test.backends import choose, get_backend
 from slop_test.backends.openai_compat import (
     ARE_YOU_SURE,
     FALLBACK,
@@ -254,6 +254,15 @@ def test_from_env():
     assert backend.base_url == "https://llm.test/v1"
     assert backend.model == "test-model"
     assert backend.read_the_code is True
+
+
+def test_the_mock_stands_in_until_a_model_is_set_up(monkeypatch):
+    assert choose("llm") == choose("openai") == "mock"
+    monkeypatch.setenv("SLOP_TEST_BASE_URL", "https://llm.test/v1")
+    assert choose("llm") == "mock"
+    monkeypatch.setenv("SLOP_TEST_MODEL", "test-model")
+    assert choose("llm") == choose("openai") == "llm"
+    assert choose("mock") == "mock"
 
 
 @pytest.mark.parametrize("name", ["llm", "openai"], ids=["name", "old-name"])

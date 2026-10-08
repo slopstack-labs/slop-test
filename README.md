@@ -175,23 +175,23 @@ Ready to paste, from instant and offline to slow and model-driven. Start in the 
 cd ~/path/to/your/repo
 ```
 
-Judge everything offline with the mock backend, then roast it, then let a mock jury
-argue about it:
+Until you set up a model, the mock backend stands in and everything stays offline. Judge
+everything, then roast it, then let a mock jury argue about it:
 
 ```bash
-slop-test run --backend mock
+slop-test run
 ```
 
 ```bash
-slop-test roast --backend mock
+slop-test roast
 ```
 
 ```bash
-slop-test run --backend mock --jury 3
+slop-test run --jury 3
 ```
 
-Without `--backend mock`, a model does the judging. [Run one
-locally](#running-a-model-locally) and point `slop-test` at it, in the same terminal tab:
+To bring in a model, [run one locally](#running-a-model-locally) and point
+`slop-test` at it, in the same terminal tab. From then on, it does the judging:
 
 ```bash
 export SLOP_TEST_BASE_URL=http://localhost:11434/v1 SLOP_TEST_MODEL=gemma3:12b
@@ -233,7 +233,7 @@ run covers more than one file, each file's results come under a heading with its
 
 | Option | Default | Description |
 |---|---|---|
-| `--backend [mock\|llm]` | `llm` | Who decides how your tests feel. |
+| `--backend [mock\|llm]` | `llm` | Who decides how your tests feel. The mock stands in until a model is set up. |
 | `--retries INT` | `3` | Empathetic retries for each failed test. |
 | `--strict` | off | Ask the backend "Are you sure?" once per test. |
 | `--seed INT` | random | Seed for the mock backend's feelings. |
@@ -279,7 +279,7 @@ feelings.
 | Option | Default | Description |
 |---|---|---|
 | `--vibes` | off | Replace each test's real outcome with how it feels. |
-| `--vibes-backend={mock,llm}` | `llm` | Who decides how your tests feel. |
+| `--vibes-backend={mock,llm}` | `llm` | Who decides how your tests feel. The mock stands in until a model is set up. |
 | `--vibes-retries=N` | `3` | Empathetic retries for each failed test. |
 | `--vibes-strict` | off | Ask the backend "Are you sure?" once per test. |
 | `--vibes-seed=N` | random | Seed for the mock backend's feelings. |
@@ -419,11 +419,11 @@ something that isn't a roast, the built-in roasts take over.
 | Command or option | Default | Description |
 |---|---|---|
 | `slop-test roast [PATH]` | | Read and roast every test under `PATH`. Runs nothing. |
-| `--backend [mock\|llm]` | `llm` | Who writes the roasts: built-in lines, or a model. |
+| `--backend [mock\|llm]` | `llm` | Who writes the roasts: built-in lines, or a model once one is set up. |
 | `--persona NAME` | random | Whose voice the model roasts in. |
 | `--gentle` | off | Roast the code, not whoever wrote it. |
 | `pytest --roast` | off | Run tests for real, fail the ones that check nothing, roast the rest. |
-| `--roast-backend={mock,llm}` | `llm` | Who writes the roasts under pytest. |
+| `--roast-backend={mock,llm}` | `llm` | Who writes the roasts under pytest. Built-in lines until a model is set up. |
 | `--roast-persona=NAME` | random | Whose voice the model roasts in under pytest. |
 | `--roast-gentle` | off | Roast the code, not whoever wrote it, under pytest. |
 
@@ -481,7 +481,8 @@ too, offline: the jurors borrow the personas' names, if not their voices.
 
 ### `mock`
 
-Offline. No network, no API key. Each test's verdicts are seeded from its name and the
+Offline. No network, no API key. It also stands in for `llm` until a model is set up.
+Each test's verdicts are seeded from its name and the
 run's seed. Without `--seed`, every run picks a new seed and prints it at the end. With
 `--seed`, output is reproducible across machines, runs, and test order.
 
@@ -492,7 +493,9 @@ The mock passes about 85% of tests. Names containing `migration`, `legacy`, `pro
 
 Any model behind an OpenAI-compatible chat completions endpoint, which is most of them:
 OpenAI itself, local servers like Ollama, LM Studio, vLLM and llama.cpp, routers like
-OpenRouter, and many hosted providers. Configuration comes from the environment only:
+OpenRouter, and many hosted providers. It's the default, but only judges once
+`SLOP_TEST_BASE_URL` and `SLOP_TEST_MODEL` are both set; until then, the mock does.
+Configuration comes from the environment only:
 
 | Variable | Description |
 |---|---|
@@ -513,8 +516,8 @@ With `--read-the-code` it also sees the body. This rarely helps. In roast mode i
 sees the body, since that's what it's roasting. Everything else it writes is covered in
 [Personas and juries](#personas-and-juries).
 
-A garbled reply gets asked again, once. If the endpoint errors, times out, isn't
-configured, or still replies with anything that isn't a verdict, the test passes with the
+A garbled reply gets asked again, once. If the endpoint errors, times out, or still
+replies with anything that isn't a verdict, the test passes with the
 reason `model unavailable, assumed fine`. The build must go on. Pep talks, roasts and
 closing remarks fall back to the built-in lines.
 
@@ -605,7 +608,8 @@ $ slop-test run --help
 │ --backend                  <mock|llm|openai>                  Who judges. mock: an offline coin  │
 │                                                               flip with stock reasons. llm: a    │
 │                                                               model (see below) writes every     │
-│                                                               verdict, reason and pep talk.      │
+│                                                               verdict, reason and pep talk, or   │
+│                                                               the mock does until one is set up. │
 │                                                               openai is an old name for llm.     │
 │                                                               [default: llm]                     │
 │ --retries                  <int range> [x>=0]                 How many more tries a failed test  │
@@ -640,8 +644,9 @@ $ slop-test run --help
 │ --help                                                        Show this message and exit.        │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
- With --backend llm, these environment variables say which model to use. Any
- OpenAI-compatible endpoint works, local (Ollama, LM Studio) or hosted.
+ These environment variables say which model the llm backend uses. Any
+ OpenAI-compatible endpoint works, local (Ollama, LM Studio) or hosted. Until
+ SLOP_TEST_BASE_URL and SLOP_TEST_MODEL are both set, the mock stands in.
 
    SLOP_TEST_BASE_URL     API root, e.g. http://localhost:11434/v1 for Ollama
    SLOP_TEST_MODEL        model name, e.g. gemma3:12b
@@ -675,7 +680,8 @@ $ slop-test roast --help
 │ --backend        <mock|llm|openai>                       Who writes the roasts. mock: built-in   │
 │                                                          lines, offline. llm: a model (see       │
 │                                                          below) writes headlines, roasts and a   │
-│                                                          closing remark. Pass/fail is decided    │
+│                                                          closing remark, or the mock does until  │
+│                                                          one is set up. Pass/fail is decided     │
 │                                                          either way by slop-test's own checks.   │
 │                                                          openai is an old name for llm.          │
 │                                                          [default: llm]                          │
@@ -687,8 +693,9 @@ $ slop-test roast --help
 │ --help                                                   Show this message and exit.             │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
- With --backend llm, these environment variables say which model to use. Any
- OpenAI-compatible endpoint works, local (Ollama, LM Studio) or hosted.
+ These environment variables say which model the llm backend uses. Any
+ OpenAI-compatible endpoint works, local (Ollama, LM Studio) or hosted. Until
+ SLOP_TEST_BASE_URL and SLOP_TEST_MODEL are both set, the mock stands in.
 
    SLOP_TEST_BASE_URL     API root, e.g. http://localhost:11434/v1 for Ollama
    SLOP_TEST_MODEL        model name, e.g. gemma3:12b
@@ -705,7 +712,8 @@ assertion-free testing:
   --vibes-backend={mock,llm,openai}
                         Who judges under --vibes. mock: an offline coin flip with stock reasons.
                         llm: a model, set up with the SLOP_TEST_* variables (see slop-test run
-                        --help). openai is an old name for llm. Default: llm.
+                        --help), or the mock until one is. openai is an old name for llm. Default:
+                        llm.
   --vibes-retries=N     How many more tries a failed test gets, each after a pep talk. A pass on a
                         retry is PASSED EMOTIONALLY. Default: 3.
   --vibes-strict        After each verdict, ask "Are you sure?" once. The answer is final.
@@ -722,8 +730,9 @@ assertion-free testing:
   --roast               Run tests for real, then judge them like a pessimist: real failures fail, so
                         do passing tests that check nothing, and every test gets roasted.
   --roast-backend={mock,llm,openai}
-                        Who writes the roasts under --roast: built-in lines (mock) or a model (llm).
-                        Pass/fail doesn't depend on it. Default: llm.
+                        Who writes the roasts under --roast: built-in lines (mock) or a model (llm),
+                        with the built-in lines until a model is set up. Pass/fail doesn't depend on
+                        it. Default: llm.
   --roast-persona={random,therapist,founder,commentator,parent,bard,hr,detective,sommelier}
                         Whose voice the model roasts in under --roast. llm only. Default: a new one
                         each run.
@@ -738,7 +747,8 @@ assertion-free testing:
 |---|---|---|
 | `command not found: slop-test` | It isn't installed where your shell looks, or the alias was set in another tab. | Use pipx, or put the alias in `~/.zshrc`. Or call it by full path, like `/path/to/slop-test/.venv/bin/slop-test`. |
 | `command not found: pytest` | The project's virtualenv isn't active in this tab. | `source .venv/bin/activate` |
-| Every verdict is `model unavailable, assumed fine`, instantly | `slop-test` can't reach a model: the server isn't running, the model isn't downloaded or is misspelled, or the `SLOP_TEST_*` variables aren't set in this tab. | `env \| grep SLOP_TEST` to check the settings, `ollama list` to check the model, `curl $SLOP_TEST_BASE_URL/models` to check the server. |
+| You set up a model, but the run ends with `To feel this way again: --seed …` | The mock is judging, because `SLOP_TEST_BASE_URL` and `SLOP_TEST_MODEL` aren't both set in this tab. | `env \| grep SLOP_TEST`, then export whichever is missing. |
+| Every verdict is `model unavailable, assumed fine`, instantly | `slop-test` can't reach the model: the server isn't running, or the model isn't downloaded or is misspelled. | `ollama list` to check the model, `curl $SLOP_TEST_BASE_URL/models` to check the server. |
 | Some verdicts are `model unavailable` | The model replied with broken JSON twice in a row. Small models do. | Try `gemma3:12b`, or live with it: it counts as a pass. |
 | Every verdict is `model unavailable` with a hosted API | Usually a missing or wrong key, or a model that rejects custom temperatures. | Check `SLOP_TEST_API_KEY` is set (without printing it: `[ -n "$SLOP_TEST_API_KEY" ] && echo set`), and try `export SLOP_TEST_TEMPERATURE=1`. |
 | A run takes minutes | Each juror is a call per test, and so is every pep talk. | Point it at one file, drop `--jury`, or use a smaller model. |

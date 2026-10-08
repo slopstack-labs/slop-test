@@ -271,15 +271,14 @@ def test_cli_roast_exits_0_when_nothing_is_weak(tmp_path):
     assert result.output.splitlines()[-1].endswith(tuple(CLOSERS["none ran"]))
 
 
-def test_cli_roast_with_an_unconfigured_model_uses_built_in_roasts(suite, monkeypatch):
-    monkeypatch.delenv("SLOP_TEST_BASE_URL", raising=False)
-    monkeypatch.delenv("SLOP_TEST_MODEL", raising=False)
+@pytest.mark.parametrize("args", [[], ["--backend", "llm"]], ids=["default", "llm"])
+def test_cli_roast_without_a_model_set_up_is_the_mock(suite, args):
+    without_model = runner.invoke(app, ["roast", str(suite), *args])
 
-    with_model = runner.invoke(app, ["roast", str(suite)])
-
-    presiding, blank, *rest = with_model.output.splitlines(keepends=True)
-    assert presiding.startswith("Presiding: ")
-    assert "".join(rest) == runner.invoke(app, ["roast", str(suite), "--backend", "mock"]).output
+    assert (
+        without_model.output
+        == runner.invoke(app, ["roast", str(suite), "--backend", "mock"]).output
+    )
 
 
 def at(day, hour):
