@@ -173,11 +173,22 @@ def parse_roasts(content: str) -> list[str]:
     roasts = _json_object(content).get("roasts")
     if not isinstance(roasts, list):
         raise ValueError("roasts is not a list")
-    lines = [" ".join(r.split())[:MAX_ROAST_LENGTH] for r in roasts if isinstance(r, str)]
+    lines = [_shorten(" ".join(r.split())) for r in roasts if isinstance(r, str)]
     lines = [line for line in lines if line]
     if not lines:
         raise ValueError("no roasts in reply")
     return lines[:MAX_ROASTS]
+
+
+def _shorten(text: str, limit: int = MAX_ROAST_LENGTH) -> str:
+    """Cut at the last whole sentence that fits, or else at a word, rather than mid-word."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    sentence_end = max(cut.rfind(end) for end in (". ", "! ", "? "))
+    if sentence_end > 0:
+        return cut[: sentence_end + 1]
+    return cut[: limit - 1].rsplit(" ", 1)[0].rstrip(",;:") + "…"
 
 
 def _json_object(content: str) -> dict[str, Any]:

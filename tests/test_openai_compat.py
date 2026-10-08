@@ -246,8 +246,26 @@ def test_roast_caps_and_trims_what_the_model_says():
 
     lines = make_backend(replying(reply)).roast(TEST, status="passed", findings=[])
 
-    assert lines == ["x" * MAX_ROAST_LENGTH, "b", "c"]
+    assert lines == ["x" * (MAX_ROAST_LENGTH - 1) + "…", "b", "c"]
     assert len(lines) == MAX_ROASTS
+
+
+@pytest.mark.parametrize(
+    ("roast", "expected"),
+    [
+        ("Short and rude.", "Short and rude."),
+        ("First sentence fits. " + "Second one rambles on " * 10, "First sentence fits."),
+        ("word " * 60, ("word " * 60)[: MAX_ROAST_LENGTH - 1].rsplit(" ", 1)[0] + "…"),
+    ],
+    ids=["fits", "sentence", "words"],
+)
+def test_long_roasts_are_cut_at_a_sentence_or_word(roast, expected):
+    reply = json.dumps({"roasts": [roast]})
+
+    [line] = make_backend(replying(reply)).roast(TEST, status="passed", findings=[])
+
+    assert line == expected.strip()
+    assert len(line) <= MAX_ROAST_LENGTH
 
 
 @pytest.mark.parametrize(
