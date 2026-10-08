@@ -1,8 +1,11 @@
-"""`pytest --vibes`: replace every test's real outcome with how it feels.
+"""`pytest --vibes` and `pytest --roast`. Without either, this plugin does nothing.
 
 Under --vibes no test body, fixture, setup or teardown runs. Each collected item is judged
 with the same backend and retry logic as `slop-test run`, and the verdict is reported as
-its outcome. Without --vibes this plugin does nothing.
+its outcome.
+
+Under --roast every test runs for real, then gets a pessimist's verdict: real failures
+fail, and so do passing tests that don't check anything.
 """
 
 from __future__ import annotations
@@ -12,11 +15,13 @@ from pathlib import Path
 
 import pytest
 
+from slop_test import roast
 from slop_test.backends import BACKEND_NAMES, get_backend
 from slop_test.backends.mock import random_seed
+from slop_test.backends.openai_compat import OpenAICompatBackend
 from slop_test.discovery import DiscoveredTest
 from slop_test.judge import Verdict, judge
-from slop_test.report import seed_hint, summary_line, supportive_line
+from slop_test.report import ROAST_MARKS, seed_hint, summary_line, supportive_line
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -56,11 +61,27 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         help="Also send each test's body to the backend.",
     )
+    group.addoption(
+        "--roast",
+        action="store_true",
+        help="Run tests for real, fail the ones that check nothing, and roast the rest.",
+    )
+    group.addoption(
+        "--roast-backend",
+        choices=BACKEND_NAMES,
+        default="mock",
+        help="Who writes the roasts: built-in lines (mock) or a model (openai). Default: mock.",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    if config.getoption("vibes"):
+    vibes, roasting = config.getoption("vibes"), config.getoption("roast")
+    if vibes and roasting:
+        raise pytest.UsageError("--vibes and --roast disagree about everything. Pick one.")
+    if vibes:
         config.pluginmanager.register(VibesPlugin(config), "slop-test-vibes")
+    elif roasting:
+        config.pluginmanager.register(RoastPlugin(config), "slop-test-roast")
 
 
 class VibesPlugin:
@@ -120,6 +141,42 @@ class VibesPlugin:
         terminalreporter.write_line(summary_line(list(self.verdicts.values())))
         if self.show_seed:
             terminalreporter.write_line(seed_hint("--vibes-seed", self.seed))
+
+
+class RoastPlugin:
+    def __init__(self, config: pytest.Config) -> None:
+        self.model = None
+        if config.getoption("roast_backend") == "openai":
+            self.model = OpenAICompatBackend.from_env(read_the_code=True)
+        self.results: dict[str, roast.Roast] = {}
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]):
+        report: pytest.TestReport = yield
+        # A test's verdict comes from its call, or from its setup if it never got that far.
+        if report.when == "call" or (report.when == "setup" and not report.passed):
+            self._judge(item, report)
+        return report
+
+    def _judge(self, item: pytest.Item, report: pytest.TestReport) -> None:
+        outcome: roast.Outcome = (
+            "passed" if report.passed else "skipped" if report.skipped else "failed"
+        )
+        duration = report.duration if report.when == "call" else None
+        result = roast.roast(as_discovered(item), outcome, duration=duration, model=self.model)
+        if result.status == "failed" and report.passed:
+            report.outcome = "failed"
+            report.longrepr = "\n".join((f"It {result.headline}.", *result.roasts))
+        self.results[item.nodeid] = result
+
+    def pytest_terminal_summary(self, terminalreporter: pytest.TerminalReporter) -> None:
+        terminalreporter.write_sep("=", "roast")
+        for nodeid, result in self.results.items():
+            mark, color = ROAST_MARKS[result.status]
+            terminalreporter.write_line(f"{mark} {nodeid}: {result.headline}", **{color: True})
+            for line in result.roasts:
+                terminalreporter.write_line(f"    {line}")
+        terminalreporter.write_line(roast.summary_line(list(self.results.values())))
 
 
 def as_discovered(item: pytest.Item) -> DiscoveredTest:

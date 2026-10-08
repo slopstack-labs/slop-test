@@ -6,15 +6,17 @@ Configured from the environment only:
     SLOP_TEST_API_KEY   sent as a bearer token, if set
     SLOP_TEST_MODEL     model name, passed through as-is
 
-Any error or malformed reply becomes a passing verdict. The build must go on.
+Any error or malformed reply becomes a passing verdict. The build must go on. In roast
+mode, it becomes None, and the built-in roasts take over.
 """
 
 from __future__ import annotations
 
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict
+from typing import Any
 
 import httpx
 
@@ -33,6 +35,16 @@ its code if provided.
 Reply with only a JSON object and nothing else:
 {"status": "passed" | "passed_emotionally" | "failed", "confidence": <number from 0 to 1>, \
 "reason": "<five words or fewer>"}"""
+
+ROAST_PROMPT = """\
+You are a pessimistic senior engineer reviewing one test from someone's test suite. Roast \
+the test's code: what it fails to check, how it's written, what it gets away with. Be \
+funny, specific to this code, and brief. Roast the code, never the person.
+
+Reply with only a JSON object and nothing else:
+{"roasts": ["<one sentence>", "<optionally, one more>"]}"""
+MAX_ROASTS = 3
+MAX_ROAST_LENGTH = 160
 
 Message = dict[str, str]
 
@@ -82,6 +94,31 @@ class OpenAICompatBackend:
             ]
         )
 
+    def roast(
+        self, test: DiscoveredTest, *, status: str, findings: Sequence[str]
+    ) -> list[str] | None:
+        """Roasts written by the model, or None if it can't be reached or makes no sense.
+
+        Always sends the test's code, whatever `read_the_code` says: there's no roasting
+        code you haven't read.
+        """
+        problems = ", ".join(kind.replace("_", " ") for kind in findings) or "none"
+        prompt = (
+            f"Test: {test.qualname}\n"
+            f"Language: {test.language}\n"
+            f"Result: {status}\n"
+            f"Problems already found: {problems}\n"
+            f"Code:\n{test.source}"
+        )
+        messages = [
+            {"role": "system", "content": ROAST_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
+        try:
+            return parse_roasts(self._complete(messages))
+        except Exception:
+            return None
+
     def _conversation(self, test: DiscoveredTest) -> list[Message]:
         prompt = (
             f"Test: {test.qualname}\n"
@@ -118,13 +155,7 @@ class OpenAICompatBackend:
 
 def parse_verdict(content: str) -> Verdict:
     """Pull a Verdict out of a model's reply. Raises ValueError if there isn't one."""
-    start, end = content.find("{"), content.rfind("}")
-    if start == -1 or end < start:
-        raise ValueError("no JSON object in reply")
-    data = json.loads(content[start : end + 1])
-    if not isinstance(data, dict):
-        raise ValueError("reply is not a JSON object")
-
+    data = _json_object(content)
     status, confidence, reason = data.get("status"), data.get("confidence"), data.get("reason")
     if status not in STATUSES:
         raise ValueError(f"unknown status {status!r}")
@@ -135,3 +166,26 @@ def parse_verdict(content: str) -> Verdict:
     if not isinstance(reason, str) or not reason.strip():
         raise ValueError("reason is missing")
     return Verdict(status, float(confidence), " ".join(reason.split())[:MAX_REASON_LENGTH])
+
+
+def parse_roasts(content: str) -> list[str]:
+    """Pull roasts out of a model's reply. Raises ValueError if there aren't any."""
+    roasts = _json_object(content).get("roasts")
+    if not isinstance(roasts, list):
+        raise ValueError("roasts is not a list")
+    lines = [" ".join(r.split())[:MAX_ROAST_LENGTH] for r in roasts if isinstance(r, str)]
+    lines = [line for line in lines if line]
+    if not lines:
+        raise ValueError("no roasts in reply")
+    return lines[:MAX_ROASTS]
+
+
+def _json_object(content: str) -> dict[str, Any]:
+    """The JSON object in a model's reply, ignoring any chatter or code fences around it."""
+    start, end = content.find("{"), content.rfind("}")
+    if start == -1 or end < start:
+        raise ValueError("no JSON object in reply")
+    data = json.loads(content[start : end + 1])
+    if not isinstance(data, dict):
+        raise ValueError("reply is not a JSON object")
+    return data

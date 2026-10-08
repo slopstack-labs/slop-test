@@ -9,6 +9,9 @@ from slop_test.backends.openai_compat import (
     ARE_YOU_SURE,
     FALLBACK,
     MAX_REASON_LENGTH,
+    MAX_ROAST_LENGTH,
+    MAX_ROASTS,
+    ROAST_PROMPT,
     OpenAICompatBackend,
 )
 from slop_test.judge import Verdict
@@ -218,3 +221,43 @@ def test_api_key_never_shows_up(capsys):
     assert API_KEY not in repr(backend)
     assert API_KEY not in str(verdict)
     assert API_KEY not in "".join(capsys.readouterr())
+
+
+def test_roast_sends_the_code_and_returns_the_lines():
+    requests = []
+    reply = json.dumps({"roasts": ["  Asserts   nothing,\nconfidently.  ", "Also, hunter2?"]})
+
+    lines = make_backend(replying(reply, requests)).roast(
+        TEST, status="failed", findings=["no_assertions", "vague_name"]
+    )
+
+    assert lines == ["Asserts nothing, confidently.", "Also, hunter2?"]
+    messages = json.loads(requests[0].content)["messages"]
+    assert messages[0]["content"] == ROAST_PROMPT
+    prompt = messages[-1]["content"]
+    assert "Result: failed" in prompt
+    assert "no assertions, vague name" in prompt
+    assert "hunter2" in prompt  # the code goes along even without read_the_code
+
+
+def test_roast_caps_and_trims_what_the_model_says():
+    reply = json.dumps({"roasts": ["x" * 500, "", 42, "b", "c", "d"]})
+
+    lines = make_backend(replying(reply)).roast(TEST, status="passed", findings=[])
+
+    assert lines == ["x" * MAX_ROAST_LENGTH, "b", "c"]
+    assert len(lines) == MAX_ROASTS
+
+
+@pytest.mark.parametrize(
+    "handler",
+    [
+        lambda request: httpx.Response(500),
+        replying("I'd rather not."),
+        replying('{"roasts": "not a list"}'),
+        replying('{"roasts": ["", "   "]}'),
+    ],
+    ids=["http-error", "not-json", "not-a-list", "empty"],
+)
+def test_roast_returns_none_when_the_model_lets_us_down(handler):
+    assert make_backend(handler).roast(TEST, status="passed", findings=[]) is None

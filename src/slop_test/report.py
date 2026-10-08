@@ -8,6 +8,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.text import Text
 
+from slop_test import roast
 from slop_test.discovery import DiscoveredTest
 from slop_test.judge import Status, Verdict
 
@@ -15,6 +16,12 @@ MARKS: dict[Status, tuple[str, str]] = {
     "passed": ("✓", "green"),
     "passed_emotionally": ("~", "yellow"),
     "failed": ("✗", "red"),
+}
+ROAST_MARKS: dict[roast.RoastStatus, tuple[str, str]] = {
+    "passed": ("✓", "green"),
+    "failed": ("✗", "red"),
+    "skipped": ("-", "yellow"),
+    "not run": ("?", "yellow"),
 }
 
 SUPPORTIVE_LINES = (
@@ -75,11 +82,19 @@ class Reporter:
         self.console.print(Text(f"  {supportive_line(test, attempt)}", "dim italic"))
 
     def result(self, test: DiscoveredTest, verdict: Verdict) -> None:
-        mark, color = MARKS[verdict.status]
+        self._line(test, MARKS[verdict.status], verdict.reason)
+
+    def roasted(self, test: DiscoveredTest, result: roast.Roast) -> None:
+        self._line(test, ROAST_MARKS[result.status], result.headline)
+        for line in result.roasts:
+            self.console.print(Text(f"    {line}", "italic"))
+
+    def _line(self, test: DiscoveredTest, mark_and_color: tuple[str, str], why: str) -> None:
+        mark, color = mark_and_color
         line = Text.assemble(
             (mark, f"bold {color}"),
             f" {test.qualname.ljust(self.name_width)}  ",
-            (f"({verdict.reason})", "dim"),
+            (f"({why})", "dim"),
         )
         self.console.print(line)
 
@@ -87,6 +102,11 @@ class Reporter:
         color = "red" if any(v.failed for v in verdicts) else "green"
         self.console.print()
         self.console.print(Text(summary_line(verdicts), f"bold {color}"))
+
+    def roast_summary(self, results: Sequence[roast.Roast]) -> None:
+        color = "red" if any(r.status == "failed" for r in results) else "green"
+        self.console.print()
+        self.console.print(Text(roast.summary_line(results), f"bold {color}"))
 
     def seed(self, seed: int) -> None:
         self.console.print(Text(seed_hint("--seed", seed), "dim"))
