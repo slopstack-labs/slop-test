@@ -1,8 +1,10 @@
-"""Who last touched a test, and when, according to git. For roasting purposes only."""
+"""When a test was last touched, according to git. For roasting purposes only.
+
+Deliberately not who: roasts say "you", and nobody's name goes anywhere.
+"""
 
 from __future__ import annotations
 
-import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -14,7 +16,6 @@ UNCOMMITTED = "Not Committed Yet"  # what git blame calls lines nobody has commi
 
 @dataclass(frozen=True)
 class Blame:
-    name: str | None  # None when the lines aren't committed: git doesn't know whose they are
     when: datetime | None  # in the author's own time zone; None when not committed
 
     @property
@@ -52,16 +53,9 @@ def parse_porcelain(output: str) -> Blame | None:
     if not commits:
         return None
     if any(c["author"] == UNCOMMITTED for c in commits):
-        return Blame(name=None, when=None)
+        return Blame(when=None)
     latest = max(commits, key=lambda c: int(c.get("author-time", 0)))
-    return Blame(name=first_name(latest["author"]), when=_when(latest))
-
-
-def first_name(author: str) -> str:
-    """What to call someone: "Lars Atassi" and "LarsAtassi" are both "Lars"."""
-    first = author.split()[0]
-    camel = re.match(r"[A-Z][a-z]+(?=[A-Z])", first)
-    return camel.group(0) if camel else first
+    return Blame(when=_when(latest))
 
 
 def _when(commit: dict[str, str]) -> datetime:

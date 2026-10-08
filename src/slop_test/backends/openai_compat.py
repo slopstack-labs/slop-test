@@ -58,8 +58,8 @@ ROAST_TASK = (
     "You are reviewing one test from someone's test suite, pessimistically. Roast the "
     "developer who wrote it, through what this code says about them: their habits, "
     "shortcuts, priorities and coping mechanisms, and when they committed it. They asked "
-    'for this, so be merciless and specific. Talk to them directly, as "you" (by name '
-    "if you have one), and never guess their pronouns. "
+    'for this, so be merciless and specific. Talk to them directly, as "you": never use a '
+    "name, and never guess their pronouns. "
     "Stick to what the code and its history show: never their looks, identity, or "
     "anything outside their work. The verdict is already decided; write a headline that "
     "says the same thing in your own words." + _ROAST_REPLY
@@ -161,7 +161,7 @@ class OpenAICompatBackend:
 
         Always sends the test's code, whatever `read_the_code` says: there's no roasting
         code you haven't read. Unless `gentle`, the roasts are aimed at the developer, and
-        `who` (from git blame) says who that is and when they committed.
+        `who` (from git blame) says when they last committed it. Never who they are.
         """
         problems = ", ".join(kind.replace("_", " ") for kind in findings) or "none"
         prompt = (
@@ -171,7 +171,7 @@ class OpenAICompatBackend:
             f"Problems already found: {problems}\n"
         )
         if not gentle:
-            prompt += f"Written by: {_describe(who)}\n"
+            prompt += f"Last committed: {_describe(who)}\n"
         prompt += f"Code:\n{test.source}"
         task = GENTLE_ROAST_TASK if gentle else ROAST_TASK
         try:
@@ -276,9 +276,8 @@ def _describe(who: Blame | None) -> str:
     if who is None:
         return "unknown"
     if who.when is None:
-        return "nobody yet: it isn't even committed"
-    name = who.name or "someone"
-    return f"{name}, last committed on a {who.when:%A} at {who.when:%H:%M}"
+        return "never: it isn't even committed"
+    return f"on a {who.when:%A} at {who.when:%H:%M}"
 
 
 def _tidy(text: str, limit: int = MAX_ROAST_LENGTH) -> str:

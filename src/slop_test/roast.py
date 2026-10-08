@@ -123,8 +123,7 @@ ROASTS = {
     ),
 }
 
-# The default: aimed at whoever wrote the test. Each starts lowercase so it can follow a
-# name ("Lars, you wrote...").
+# The default: aimed at whoever wrote the test, as "you". Never by name.
 DEV_ROASTS = {
     "no_assertions": (
         "you wrote a test that checks nothing, then went to lunch.",
@@ -270,8 +269,8 @@ def roast(
 ) -> Roast:
     """A pessimist's verdict. `outcome` is what really happened, or None if it never ran.
 
-    The roasts go after whoever last touched the test, according to git, unless `gentle`,
-    in which case they stick to the code.
+    The roasts go after whoever wrote the test, as "you", and use git to see when they last
+    touched it. With `gentle`, they stick to the code.
     """
     kinds = critique(test, duration=duration)
     weakness = next((kind for kind in kinds if kind in WEAK), None)
@@ -330,12 +329,7 @@ def _built_in_roasts(
     if who is not None and (when := _when_to_roast(who)):
         time = {"time": f"{who.when:%H:%M}", "day": f"{who.when:%A}"} if who.when else {}
         lines.append(_pick(test, when, WHEN_ROASTS[when]).format(**time))
-    # Only the first line gets the name; one "Lars," per test is plenty.
-    name = who.name if who else None
-    return tuple(
-        f"{name}, {line}" if name and i == 0 else line[:1].upper() + line[1:]
-        for i, line in enumerate(lines)
-    )
+    return tuple(line[:1].upper() + line[1:] for line in lines)
 
 
 def _when_to_roast(who: Blame) -> str | None:

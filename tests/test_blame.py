@@ -1,10 +1,9 @@
 import subprocess
 from datetime import timedelta
 
-import pytest
 from fakes import make_test
 
-from slop_test.blame import Blame, blame, first_name, parse_porcelain
+from slop_test.blame import Blame, blame, parse_porcelain
 
 PORCELAIN = """\
 1111111111111111111111111111111111111111 1 1 1
@@ -29,7 +28,6 @@ filename test_cart.py
 def test_the_latest_commit_is_the_one_to_blame():
     who = parse_porcelain(PORCELAIN)
 
-    assert who.name == "Grace"
     assert who.when.utcoffset() == timedelta(hours=2)
     assert who.when.timestamp() == 1791450000
 
@@ -43,19 +41,15 @@ def test_time_zones_west_of_greenwich():
 def test_uncommitted_lines_have_nobody_to_blame():
     porcelain = PORCELAIN.replace("author Grace Hopper", "author Not Committed Yet")
 
-    assert parse_porcelain(porcelain) == Blame(name=None, when=None)
+    assert parse_porcelain(porcelain) == Blame(when=None)
 
 
 def test_no_output_no_blame():
     assert parse_porcelain("") is None
 
 
-@pytest.mark.parametrize(
-    ("author", "name"),
-    [("Lars Atassi", "Lars"), ("LarsAtassi", "Lars"), ("ada", "ada"), ("Ada", "Ada")],
-)
-def test_first_names(author, name):
-    assert first_name(author) == name
+def test_blame_keeps_no_names():
+    assert "Grace" not in repr(parse_porcelain(PORCELAIN))
 
 
 def git(repo, *args, **env):
@@ -80,7 +74,7 @@ def test_blame_reads_a_real_repo(tmp_path, monkeypatch):
 
     who = blame(test)
 
-    assert who.name == "Grace"
+    assert "Grace" not in repr(who)
     assert (who.when.weekday(), who.when.hour, who.when.minute) == (4, 23, 41)
 
 

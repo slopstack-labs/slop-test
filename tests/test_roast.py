@@ -289,19 +289,13 @@ def at(day, hour):
 SMELLY = code("test_x", "def test_x():\n    print(go())\n    time.sleep(1)\n")
 
 
-def test_roasts_go_after_whoever_last_touched_the_test(monkeypatch):
-    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame("Lars", at(7, 11)))
+@pytest.mark.parametrize("who", [None, Blame(at(7, 11))], ids=["no-git", "committed"])
+def test_roasts_talk_to_whoever_wrote_the_test_as_you(monkeypatch, who):
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: who)
 
     result = roast(SMELLY)
 
     assert len(result.roasts) == len(critique(SMELLY)) == 3
-    assert result.roasts[0].startswith("Lars, you ")
-    assert not any("Lars" in line for line in result.roasts[1:])  # once is plenty
-
-
-def test_without_git_the_roasts_just_say_you():
-    result = roast(SMELLY)
-
     assert result.roasts[0] in [capitalized(line) for line in DEV_ROASTS["no_assertions"]]
 
 
@@ -314,17 +308,17 @@ def test_without_git_the_roasts_just_say_you():
     ],
 )
 def test_commit_times_get_jabs(monkeypatch, moment, jab, detail):
-    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame("Lars", moment))
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame(moment))
 
     [line] = roast(GOOD).roasts
 
     assert detail in line
     expected = [o.format(time=f"{moment:%H:%M}", day=f"{moment:%A}") for o in WHEN_ROASTS[jab]]
-    assert line.removeprefix("Lars, ") in expected
+    assert line in [capitalized(o) for o in expected]
 
 
-def test_uncommitted_tests_get_a_jab_without_a_name(monkeypatch):
-    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame(None, None))
+def test_uncommitted_tests_get_a_jab(monkeypatch):
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame(None))
 
     [line] = roast(GOOD).roasts
 
@@ -332,7 +326,7 @@ def test_uncommitted_tests_get_a_jab_without_a_name(monkeypatch):
 
 
 def test_an_ordinary_commit_time_is_not_worth_mentioning(monkeypatch):
-    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame("Lars", at(7, 11)))
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame(at(7, 11)))
 
     assert roast(GOOD).roasts == ()
 
@@ -350,7 +344,7 @@ def test_gentle_roasts_stick_to_the_code(monkeypatch):
 
 def test_the_model_hears_who_did_it(monkeypatch):
     model = FakeModel(None)
-    culprit = Blame("Lars", at(9, 17))
+    culprit = Blame(at(9, 17))
     monkeypatch.setattr("slop_test.roast.blame", lambda test: culprit)
 
     roast(EMPTY, model=model)

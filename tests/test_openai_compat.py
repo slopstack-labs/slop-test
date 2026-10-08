@@ -451,7 +451,7 @@ def test_single_quoted_values_are_forgiven():
 
 def test_roasting_the_developer_tells_the_model_who_did_it():
     requests = []
-    culprit = Blame("Lars", datetime(2026, 10, 9, 17, 42, tzinfo=timezone.utc))
+    culprit = Blame(datetime(2026, 10, 9, 17, 42, tzinfo=timezone.utc))
 
     make_backend(replying('{"headline": "Busted"}', requests)).roast(
         TEST, verdict="passed", findings=[], who=culprit
@@ -462,14 +462,15 @@ def test_roasting_the_developer_tells_the_model_who_did_it():
 
     rude, gentle = (json.loads(r.content)["messages"] for r in requests)
     assert rude[0]["content"] == ROAST_TASK
-    assert "Written by: Lars, last committed on a Friday at 17:42" in rude[-1]["content"]
+    assert "Last committed: on a Friday at 17:42" in rude[-1]["content"]
+    assert "never use a name" in rude[0]["content"]
     assert gentle[0]["content"] == GENTLE_ROAST_TASK
-    assert "Written by" not in gentle[-1]["content"]
+    assert "Last committed" not in gentle[-1]["content"]
 
 
 @pytest.mark.parametrize(
     ("who", "described"),
-    [(None, "unknown"), (Blame(None, None), "nobody yet: it isn't even committed")],
+    [(None, "unknown"), (Blame(None), "never: it isn't even committed")],
 )
 def test_roasting_without_a_known_culprit(who, described):
     requests = []
@@ -478,4 +479,6 @@ def test_roasting_without_a_known_culprit(who, described):
         TEST, verdict="passed", findings=[], who=who
     )
 
-    assert f"Written by: {described}" in json.loads(requests[0].content)["messages"][-1]["content"]
+    assert (
+        f"Last committed: {described}" in json.loads(requests[0].content)["messages"][-1]["content"]
+    )

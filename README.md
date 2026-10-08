@@ -288,19 +288,19 @@ $ pytest examples/roast_me.py -q --roast --tb=no
 ==================================== roast =====================================
 ✓ examples/roast_me.py::test_charge_adds_vat: passed, somehow
 ✗ examples/roast_me.py::test_it_works: passed, but it checks nothing
-    Lars, you wrote this to make the test count go up, not to find bugs. It worked.
+    You wrote this to make the test count go up, not to find bugs. It worked.
     You named it 'test_it_works'. Naming things is hard, and you didn't even try.
 ✗ examples/roast_me.py::test_vat_is_correct: passed, but only proves that true is true
-    Lars, you made the test pass by testing nothing. Management would be proud.
+    You made the test pass by testing nothing. Management would be proud.
 ✓ examples/roast_me.py::test_receipt_is_eventually_emailed: passed. For now.
-    Lars, you put sleep() in a test. You don't fix race conditions, you wait them out.
+    You put sleep() in a test. You don't fix race conditions, you wait them out.
     1.1s. You run this and go make coffee, don't you.
     You debug with print() and leave the evidence at the scene.
 ✗ examples/roast_me.py::test_refund_never_crashes: passed, but it checks nothing
-    Lars, you wrote a test that checks nothing, then went to lunch.
+    You wrote a test that checks nothing, then went to lunch.
     You catch exceptions and do nothing with them. Very healthy. Very you.
 ✓ examples/roast_me.py::test_checkout_with_everything_mocked: passed. Suspicious.
-    Lars, you mocked everything so nothing could hurt you. Your therapist would like a word.
+    You mocked everything so nothing could hurt you. Your therapist would like a word.
     You left a TODO. We both know you're never coming back for it.
 3 passed, 3 failed. About what I expected.
 =========================== short test summary info ============================
@@ -317,10 +317,11 @@ roast for each thing that deserves one: `sleep()`, debug prints, swallowed excep
 more mocks than code, TODOs, tests over 40 lines or a second, and names like
 `test_it_works`.
 
-The roasts aren't aimed at the code. They're aimed at whoever wrote it. `slop-test` asks
-`git blame` who last touched each test, and when, by their own clock, and adds a jab
-for anything committed on a Friday afternoon, at the weekend, after 22:00, or not at all.
-`--gentle` (`--roast-gentle` under pytest) points the roasts back at the code.
+The roasts aren't aimed at the code. They're aimed at whoever wrote it, as "you", never
+by name. `slop-test` asks `git blame` when each test was last touched, by the author's
+own clock, and adds a jab for anything committed on a Friday afternoon, at the weekend,
+after 22:00, or not at all. `--gentle` (`--roast-gentle` under pytest) points the roasts
+back at the code.
 
 `slop-test roast` does the reading without the running, in all 22
 [supported languages](#supported-languages). Tests that check nothing fail. Everything
@@ -331,28 +332,28 @@ it a reasonable, if rude, lint step:
 $ slop-test roast examples/roast_me.py
 ? test_charge_adds_vat                  (not run. Assume the worst.)
 ✗ test_it_works                         (checks nothing, so it can't pass)
-    Lars, you wrote this to make the test count go up, not to find bugs. It worked.
+    You wrote this to make the test count go up, not to find bugs. It worked.
     You named it 'test_it_works'. Naming things is hard, and you didn't even try.
 ✗ test_vat_is_correct                   (only checks that true is true, so it can't pass)
-    Lars, you made the test pass by testing nothing. Management would be proud.
+    You made the test pass by testing nothing. Management would be proud.
 ? test_receipt_is_eventually_emailed    (not run. Assume the worst.)
-    Lars, you put sleep() in a test. You don't fix race conditions, you wait them out.
+    You put sleep() in a test. You don't fix race conditions, you wait them out.
     You debug with print() and leave the evidence at the scene.
 ✗ test_refund_never_crashes             (checks nothing, so it can't pass)
-    Lars, you wrote a test that checks nothing, then went to lunch.
+    You wrote a test that checks nothing, then went to lunch.
     You catch exceptions and do nothing with them. Very healthy. Very you.
 ? test_checkout_with_everything_mocked  (not run, so probably broken)
-    Lars, you mocked everything so nothing could hurt you. Your therapist would like a word.
+    You mocked everything so nothing could hurt you. Your therapist would like a word.
     You left a TODO. We both know you're never coming back for it.
 
 0 passed, 3 failed, 3 not run. About what I expected.
 ```
 
 With the `llm` backend, a model writes the roasts. It's sent each test's code and, unless
-you're being gentle, the name and commit time of whoever wrote it, so mind where your
-endpoint lives. It's told to go after habits, shortcuts and coping mechanisms, never
-anything outside the code and its history, and to say "you" rather than guess anyone's
-pronouns. It doesn't get a say in what passes. If it can't be reached, or replies with
+you're being gentle, when it was last committed. Never who committed it. It's told to go
+after habits, shortcuts and coping mechanisms, never anything outside the code and its
+history, and to say "you": no names, no guessed pronouns. It doesn't get a say in what
+passes. If it can't be reached, or replies with
 something that isn't a roast, the built-in roasts take over.
 
 | Command or option | Default | Description |
