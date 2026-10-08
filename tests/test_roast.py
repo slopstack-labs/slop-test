@@ -342,6 +342,16 @@ def test_gentle_roasts_stick_to_the_code(monkeypatch):
     assert result.roasts[0] in ROASTS["no_assertions"]
 
 
+def test_the_model_only_hears_about_timing_worth_a_joke(monkeypatch):
+    model = FakeModel(None)
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame(at(7, 11)))
+
+    roast(EMPTY, model=model)
+
+    [(*_, who, gentle)] = model.calls
+    assert who is None
+
+
 def test_the_model_hears_who_did_it(monkeypatch):
     model = FakeModel(None)
     culprit = Blame(at(9, 17))
