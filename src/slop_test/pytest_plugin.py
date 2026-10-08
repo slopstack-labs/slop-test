@@ -13,9 +13,10 @@ from pathlib import Path
 import pytest
 
 from slop_test.backends import BACKEND_NAMES, get_backend
+from slop_test.backends.mock import random_seed
 from slop_test.discovery import DiscoveredTest
 from slop_test.judge import Verdict, judge
-from slop_test.report import summary_line, supportive_line
+from slop_test.report import seed_hint, summary_line, supportive_line
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -46,9 +47,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption(
         "--vibes-seed",
         type=int,
-        default=0,
+        default=None,
         metavar="N",
-        help="Seed for the mock backend's feelings. Default: 0.",
+        help="Seed for the mock backend's feelings. Default: random.",
     )
     group.addoption(
         "--vibes-read-the-code",
@@ -64,9 +65,14 @@ def pytest_configure(config: pytest.Config) -> None:
 
 class VibesPlugin:
     def __init__(self, config: pytest.Config) -> None:
+        backend_name = config.getoption("vibes_backend")
+        seed = config.getoption("vibes_seed")
+        # Only the mock has feelings worth reproducing.
+        self.show_seed = seed is None and backend_name == "mock"
+        self.seed: int = random_seed() if seed is None else seed
         self.backend = get_backend(
-            config.getoption("vibes_backend"),
-            seed=config.getoption("vibes_seed"),
+            backend_name,
+            seed=self.seed,
             read_the_code=config.getoption("vibes_read_the_code"),
         )
         self.retries: int = config.getoption("vibes_retries")
@@ -112,6 +118,8 @@ class VibesPlugin:
         for line in self.support:
             terminalreporter.write_line(line)
         terminalreporter.write_line(summary_line(list(self.verdicts.values())))
+        if self.show_seed:
+            terminalreporter.write_line(seed_hint("--vibes-seed", self.seed))
 
 
 def as_discovered(item: pytest.Item) -> DiscoveredTest:

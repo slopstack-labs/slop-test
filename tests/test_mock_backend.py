@@ -11,6 +11,7 @@ from slop_test.backends.mock import (
     PASS_REASONS,
     MockBackend,
     pass_probability,
+    random_seed,
 )
 from slop_test.judge import Verdict
 
@@ -89,6 +90,10 @@ def test_are_you_sure_can_flip_either_way_or_hold():
     assert any(not v.failed for v in passed)
     assert {v.reason for v in failed if not v.failed} == {CAVE_REASON}
     assert any(v.failed for v in failed)
+
+
+def test_random_seeds_vary():
+    assert len({random_seed() for _ in range(20)}) > 1
 
 
 def test_get_backend():

@@ -136,6 +136,26 @@ def test_vibes_options_reach_the_backend(pytester, scripted):
     assert len(backend.sure_calls) == 4
 
 
+def test_vibes_without_seed_is_random_and_says_how_to_repeat_it(pytester, scripted, monkeypatch):
+    pytester.makepyfile(SUITE)
+    backend = scripted()
+    monkeypatch.setattr("slop_test.pytest_plugin.random_seed", lambda: 4242)
+
+    result = pytester.runpytest("--vibes")
+
+    assert backend.requested[1]["seed"] == 4242
+    result.stdout.fnmatch_lines(["*vibe coverage", "To feel this way again: --vibes-seed 4242"])
+
+
+def test_vibes_with_seed_keeps_quiet_about_it(pytester, scripted):
+    pytester.makepyfile(SUITE)
+    scripted()
+
+    result = pytester.runpytest("--vibes", "--vibes-seed=7")
+
+    assert "To feel this way again" not in result.stdout.str()
+
+
 def test_vibes_agree_with_slop_test_run(pytester):
     """Same seed, same feelings, whichever way you ask."""
     (pytester.path / "test_example.py").write_text(EXAMPLES.joinpath("test_example.py").read_text())

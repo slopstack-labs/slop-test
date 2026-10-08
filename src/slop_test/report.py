@@ -30,6 +30,10 @@ def supportive_line(test: DiscoveredTest, attempt: int) -> str:
     return SUPPORTIVE_LINES[(attempt - 1) % len(SUPPORTIVE_LINES)].format(name=test.name)
 
 
+def seed_hint(option: str, seed: int) -> str:
+    return f"To feel this way again: {option} {seed}"
+
+
 def vibe_coverage(verdicts: Iterable[Verdict]) -> int:
     """Mean confidence of every test that didn't fail, as a percentage.
 
@@ -71,3 +75,6 @@ class Reporter:
         color = "red" if any(v.failed for v in verdicts) else "green"
         self.console.print()
         self.console.print(Text(summary_line(verdicts), f"bold {color}"))
+
+    def seed(self, seed: int) -> None:
+        self.console.print(Text(seed_hint("--seed", seed), "dim"))

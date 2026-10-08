@@ -14,7 +14,7 @@ pip install git+https://github.com/slopstack-labs/slop-test
 ```
 
 ```
-$ slop-test run examples/
+$ slop-test run examples/ --seed 0
 ✓ test_user_login                                  (probably fine)
 ✓ test_payment_processing                          (trust the process)
   You've got this, test_data_migration.
@@ -30,7 +30,8 @@ $ slop-test run examples/
 ```
 
 Every sample in this README is real output from [`examples/`](examples/test_example.py)
-with the default mock backend. Five of those nine tests fail under pytest.
+with the default mock backend, seeded so you can reproduce it. Five of those nine tests
+fail under pytest.
 
 ---
 
@@ -60,12 +61,18 @@ a question `slop-test` does not ask.
 
 ### Non-deterministic confidence (formerly flaky tests)
 
-Every verdict carries a confidence score between 0 and 1. Ask again and the answer may
-change. What other frameworks report as a flaky test, `slop-test` reports as a range of
-emotional outcomes.
+Every verdict carries a confidence score between 0 and 1. Run the same suite twice and
+you get two different results. What other frameworks report as a flaky test, `slop-test`
+reports as a range of emotional outcomes.
 
-For audit and compliance purposes, the mock backend takes `--seed`, which makes its
-feelings reproducible.
+For audit and compliance purposes, every run ends with the seed it used:
+
+```
+9 passed, 0 failed, 77% vibe coverage
+To feel this way again: --seed 53771
+```
+
+Pass it back with `--seed` and the mock backend will feel exactly the same way.
 
 ### Empathetic retries
 
@@ -144,7 +151,7 @@ them with `ast`. Nothing is imported. Nothing runs.
 | `--backend [mock\|openai]` | `mock` | Who decides how your tests feel. |
 | `--retries INT` | `3` | Empathetic retries for each failed test. |
 | `--strict` | off | Ask the backend "Are you sure?" once per test. |
-| `--seed INT` | `0` | Seed for the mock backend's feelings. |
+| `--seed INT` | random | Seed for the mock backend's feelings. |
 | `--read-the-code` | off | Also send each test's body to the backend. |
 | `--honest-exit-codes` | off | Exit 1 if any test failed. |
 
@@ -167,7 +174,7 @@ FAILED examples/test_example.py::test_cache_invalidation - NotImplementedErro...
 FAILED examples/test_example.py::TestOnboarding::test_welcome_email_is_sent_once
 5 failed, 4 passed in 0.01s
 
-$ pytest examples/ -q --vibes
+$ pytest examples/ -q --vibes --vibes-seed 0
 ..~......                                                                [100%]
 ================================== vibe check ==================================
 You've got this, test_data_migration.
@@ -188,7 +195,7 @@ feelings.
 | `--vibes-backend={mock,openai}` | `mock` | Who decides how your tests feel. |
 | `--vibes-retries=N` | `3` | Empathetic retries for each failed test. |
 | `--vibes-strict` | off | Ask the backend "Are you sure?" once per test. |
-| `--vibes-seed=N` | `0` | Seed for the mock backend's feelings. |
+| `--vibes-seed=N` | random | Seed for the mock backend's feelings. |
 | `--vibes-read-the-code` | off | Also send each test's body to the backend. |
 
 ---
@@ -197,8 +204,9 @@ feelings.
 
 ### `mock` (default)
 
-Offline. No network, no API key. Each test's verdicts are seeded from its name and
-`--seed`, so output is reproducible across machines, runs, and test order.
+Offline. No network, no API key. Each test's verdicts are seeded from its name and the
+run's seed. Without `--seed`, every run picks a new seed and prints it at the end. With
+`--seed`, output is reproducible across machines, runs, and test order.
 
 The mock passes about 85% of tests. Names containing `migration`, `legacy`, `prod` or
 `friday` fail more often; each one halves the odds. The mock has been around.

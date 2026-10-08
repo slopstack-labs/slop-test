@@ -43,6 +43,11 @@ DOUBT_REASON = "on reflection, no"
 CAVE_REASON = "you're absolutely right, it passed"
 
 
+def random_seed() -> int:
+    """A fresh seed for runs that didn't ask for one. Short enough to type back in."""
+    return random.randrange(100_000)
+
+
 def pass_probability(qualname: str) -> float:
     lowered = qualname.lower()
     risk = sum(word in lowered for word in RISKY_WORDS)

@@ -9,6 +9,7 @@ from rich.console import Console
 
 from slop_test import __version__
 from slop_test.backends import get_backend
+from slop_test.backends.mock import random_seed
 from slop_test.discovery import discover
 from slop_test.judge import judge
 from slop_test.report import Reporter
@@ -65,9 +66,9 @@ def run(
         typer.Option("--strict", help='Ask the backend "Are you sure?" once per test.'),
     ] = False,
     seed: Annotated[
-        int,
-        typer.Option("--seed", help="Seed for the mock backend's feelings."),
-    ] = 0,
+        int | None,
+        typer.Option("--seed", help="Seed for the mock backend's feelings. Random if not given."),
+    ] = None,
     read_the_code: Annotated[
         bool,
         typer.Option("--read-the-code", help="Also send each test's body to the backend."),
@@ -96,6 +97,10 @@ def run(
         console.print(f"No tests found in {path}. Nothing to feel.")
         return
 
+    # Only the mock has feelings worth reproducing.
+    show_seed = seed is None and backend_name is BackendName.mock
+    if seed is None:
+        seed = random_seed()
     backend = get_backend(backend_name.value, seed=seed, read_the_code=read_the_code)
     verdicts = []
     for test in discovery.tests:
@@ -103,6 +108,8 @@ def run(
         reporter.result(test, verdict)
         verdicts.append(verdict)
     reporter.summary(verdicts)
+    if show_seed:
+        reporter.seed(seed)
 
     if honest_exit_codes and any(v.failed for v in verdicts):
         raise typer.Exit(1)

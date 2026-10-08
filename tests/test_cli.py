@@ -66,19 +66,33 @@ def test_version():
 
 
 def test_run_examples_end_to_end():
-    result = invoke("run", EXAMPLES)
+    result = invoke("run", EXAMPLES, "--seed", "0")
 
     assert result.exit_code == 0
     for test in discover(EXAMPLES).tests:
         assert test.qualname in result.output
     assert SUMMARY.search(result.output)
-    assert invoke("run", EXAMPLES).output == result.output
+    assert "To feel this way again" not in result.output
+    assert invoke("run", EXAMPLES, "--seed", "0").output == result.output
+
+
+def test_without_seed_every_run_is_random_and_says_how_to_repeat_it(monkeypatch):
+    seeds = iter([11, 12])
+    monkeypatch.setattr("slop_test.cli.random_seed", lambda: next(seeds))
+
+    first = invoke("run", EXAMPLES).output
+    second = invoke("run", EXAMPLES).output
+
+    assert first.endswith("\nTo feel this way again: --seed 11\n")
+    assert second.endswith("\nTo feel this way again: --seed 12\n")
+    again = invoke("run", EXAMPLES, "--seed", "11").output
+    assert again == first.removesuffix("To feel this way again: --seed 11\n")
 
 
 def test_output_format(suite, scripted):
     scripted({"test_migration": ["failed", "passed"], "test_flaky": ["failed"]})
 
-    result = invoke("run", suite)
+    result = invoke("run", suite, "--seed", "0")
 
     assert result.output == textwrap.dedent(
         """\
@@ -141,7 +155,9 @@ def test_read_the_code_reaches_the_backend(suite, scripted):
 
     invoke("run", suite, "--backend", "openai", "--read-the-code")
 
-    assert backend.requested == ("openai", {"seed": 0, "read_the_code": True})
+    name, options = backend.requested
+    assert name == "openai"
+    assert options["read_the_code"] is True
 
 
 def test_unconfigured_openai_backend_assumes_everything_is_fine(suite, monkeypatch):
@@ -154,6 +170,7 @@ def test_unconfigured_openai_backend_assumes_everything_is_fine(suite, monkeypat
     assert result.exit_code == 0
     assert result.output.count("(model unavailable, assumed fine)") == 3
     assert "sk-cli-do-not-print-me" not in result.output
+    assert "To feel this way again" not in result.output  # the model has no seed to repeat
 
 
 def test_help_disclaims_line_coverage():
