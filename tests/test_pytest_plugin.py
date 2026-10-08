@@ -108,6 +108,27 @@ def test_vibes_never_runs_bodies_or_fixtures(pytester, scripted):
     assert not (pytester.path / "body-ran").exists()
 
 
+def test_vibes_ignores_skip_and_xfail_markers(pytester, scripted):
+    pytester.makepyfile(
+        """
+        import pytest
+
+
+        @pytest.mark.skip(reason="not today")
+        def test_skipped():
+            pass
+
+
+        @pytest.mark.xfail(reason="known broken")
+        def test_expected_to_fail():
+            assert False
+        """
+    )
+    scripted()
+
+    pytester.runpytest("--vibes").assert_outcomes(passed=2)
+
+
 def test_vibes_shows_emotional_passes_as_tildes(pytester, scripted):
     pytester.makepyfile(SUITE)
     scripted({"test_wobbly": ["failed", "passed"]})

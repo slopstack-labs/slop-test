@@ -238,6 +238,22 @@ must go on.
 
 ---
 
+## Fine print
+
+- **Skip and xfail markers don't apply under `--vibes`.** pytest evaluates them during
+  setup, and under `--vibes` nothing sets up. Skipped tests are judged like everyone else.
+- **What gets searched.** `PATH` can be a directory or a single file. A file named
+  directly is collected whatever it's called. When walking a directory, `slop-test` skips
+  hidden directories, `__pycache__`, `node_modules`, `venv`, `build`, `dist`,
+  `site-packages` and `*.egg-info`, so `slop-test run .` won't judge your dependencies.
+- **Files that don't parse are skipped** with a warning, and the run carries on:
+  `! skipped tests/test_broken.py: could not parse it, felt nothing`
+- **Emotional passes are passes.** They count toward `passed` in the summary. Under
+  pytest they show up as `~` in the progress line and as `PASSED EMOTIONALLY` with `-v`.
+- **Outages count at 50% confidence.** The fallback verdict carries a confidence of 0.5,
+  so a run against an unreachable endpoint reports every test passed, at 50% vibe
+  coverage.
+
 ## Design principles
 
 - **Never runs your tests.** Static analysis only. Nothing can go wrong at runtime,
