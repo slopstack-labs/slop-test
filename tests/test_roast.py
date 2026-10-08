@@ -252,7 +252,7 @@ def suite(tmp_path):
 
 
 def test_cli_roast_output_and_exit_code(suite):
-    result = runner.invoke(app, ["roast", str(suite)])
+    result = runner.invoke(app, ["roast", str(suite), "--backend", "mock"])
 
     lines = result.output.splitlines()
     assert result.exit_code == 1
@@ -275,11 +275,11 @@ def test_cli_roast_with_an_unconfigured_model_uses_built_in_roasts(suite, monkey
     monkeypatch.delenv("SLOP_TEST_BASE_URL", raising=False)
     monkeypatch.delenv("SLOP_TEST_MODEL", raising=False)
 
-    with_model = runner.invoke(app, ["roast", str(suite), "--backend", "llm"])
+    with_model = runner.invoke(app, ["roast", str(suite)])
 
     presiding, blank, *rest = with_model.output.splitlines(keepends=True)
     assert presiding.startswith("Presiding: ")
-    assert "".join(rest) == runner.invoke(app, ["roast", str(suite)]).output
+    assert "".join(rest) == runner.invoke(app, ["roast", str(suite), "--backend", "mock"]).output
 
 
 def at(day, hour):

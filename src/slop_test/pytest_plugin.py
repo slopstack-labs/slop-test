@@ -39,10 +39,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption(
         "--vibes-backend",
         choices=(*BACKEND_NAMES, *ALIASES),
-        default="mock",
+        default="llm",
         help="Who judges under --vibes. mock: an offline coin flip with stock reasons. llm: a "
         "model, set up with the SLOP_TEST_* variables (see slop-test run --help). openai is "
-        "an old name for llm. Default: mock.",
+        "an old name for llm. Default: llm.",
     )
     group.addoption(
         "--vibes-retries",
@@ -94,9 +94,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption(
         "--roast-backend",
         choices=(*BACKEND_NAMES, *ALIASES),
-        default="mock",
+        default="llm",
         help="Who writes the roasts under --roast: built-in lines (mock) or a model (llm). "
-        "Pass/fail doesn't depend on it. Default: mock.",
+        "Pass/fail doesn't depend on it. Default: llm.",
     )
     group.addoption(
         "--roast-persona",

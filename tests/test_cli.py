@@ -63,26 +63,26 @@ def test_version():
 
 
 def test_run_examples_end_to_end():
-    result = invoke("run", EXAMPLES, "--seed", "0")
+    result = invoke("run", EXAMPLES, "--backend", "mock", "--seed", "0")
 
     assert result.exit_code == 0
     for test in discover(EXAMPLES).tests:
         assert test.qualname in result.output
     assert SUMMARY.search(result.output)
     assert "To feel this way again" not in result.output
-    assert invoke("run", EXAMPLES, "--seed", "0").output == result.output
+    assert invoke("run", EXAMPLES, "--backend", "mock", "--seed", "0").output == result.output
 
 
 def test_without_seed_every_run_is_random_and_says_how_to_repeat_it(monkeypatch):
     seeds = iter([11, 12])
     monkeypatch.setattr("slop_test.cli.random_seed", lambda: next(seeds))
 
-    first = invoke("run", EXAMPLES).output
-    second = invoke("run", EXAMPLES).output
+    first = invoke("run", EXAMPLES, "--backend", "mock").output
+    second = invoke("run", EXAMPLES, "--backend", "mock").output
 
     assert first.endswith("\nTo feel this way again: --seed 11\n")
     assert second.endswith("\nTo feel this way again: --seed 12\n")
-    again = invoke("run", EXAMPLES, "--seed", "11").output
+    again = invoke("run", EXAMPLES, "--backend", "mock", "--seed", "11").output
     assert again == first.removesuffix("To feel this way again: --seed 11\n")
 
 
@@ -169,7 +169,7 @@ def test_options_reach_the_backend(suite, scripted):
     invoke("run", suite, "--retries", "1", "--seed", "42")
 
     name, options = backend.requested
-    assert name == "mock"
+    assert name == "llm"
     assert options == {"seed": 42, "read_the_code": False, "persona": "random", "jury": 1}
     assert backend.judge_calls["test_flaky"] == 2
 

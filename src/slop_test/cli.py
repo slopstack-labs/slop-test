@@ -95,7 +95,7 @@ def run(
             "(see below) writes every verdict, reason and pep talk. openai is an old name "
             "for llm.",
         ),
-    ] = BackendName.mock,
+    ] = BackendName.llm,
     retries: Annotated[
         int,
         typer.Option(
@@ -223,7 +223,7 @@ def roast_command(
             "below) writes headlines, roasts and a closing remark. Pass/fail is decided "
             "either way by slop-test's own checks. openai is an old name for llm.",
         ),
-    ] = BackendName.mock,
+    ] = BackendName.llm,
     persona: Annotated[
         PersonaName,
         typer.Option(
