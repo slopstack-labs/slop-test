@@ -34,6 +34,9 @@ Homepage = "https://github.com/slopstack-labs/slop-test"
 [project.scripts]
 slop-test = "slop_test.cli:app"
 
+[project.entry-points.pytest11]
+slop_test = "slop_test.pytest_plugin"
+
 [tool.hatch.version]
 path = "src/slop_test/__init__.py"
 
