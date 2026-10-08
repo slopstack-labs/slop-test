@@ -170,12 +170,12 @@ def test_cli_jury_shows_the_bench_votes_and_dissent(tmp_path):
     output = runner.invoke(app, ["run", str(tmp_path), "--seed", "3", "--jury", "3"]).output
 
     lines = output.splitlines()
-    assert lines[0].startswith("The jury: ")
-    assert "(foreperson)" in lines[0]
+    assert lines[1].startswith("The jury: ")
+    assert "(foreperson)" in lines[1]
     results = [line for line in lines if line[:1] in ("✓", "~", "✗")]
     assert len(results) == 2
-    assert all(re.search(r"\((?:hung jury, )?\d–\d\. ", line) for line in results)
-    split_votes = [line for line in results if not re.search(r"\(\d–0\. ", line)]
+    assert all(re.search(r"  (?:hung jury, )?\d–\d\. ", line) for line in results)
+    split_votes = [line for line in results if not re.search(r"  \d–0\. ", line)]
     assert output.count("Dissent from ") == len(split_votes)
 
 

@@ -417,15 +417,22 @@ def roast(
     return Roast(status, headline, roasts)
 
 
+def tally(roasts: Sequence[Roast]) -> dict[RoastStatus, int]:
+    """How many roasts ended in each status: passed and failed always, the rest if any."""
+    counts = {status: sum(r.status == status for r in roasts) for status in ROAST_STATUSES}
+    return {s: n for s, n in counts.items() if n or s in ("passed", "failed")}
+
+
 def summary_line(roasts: Sequence[Roast], closer: str | None = None) -> str:
     """The counts, then `closer`, or a built-in remark that fits the counts."""
+    parts = [f"{n} {status}" for status, n in tally(roasts).items()]
+    return f"{', '.join(parts)}. {closer or built_in_closer(roasts)}"
+
+
+def built_in_closer(roasts: Sequence[Roast]) -> str:
+    """A remark that fits the counts."""
     counts = {status: sum(r.status == status for r in roasts) for status in ROAST_STATUSES}
-    parts = [f"{counts['passed']} passed", f"{counts['failed']} failed"]
-    parts += [f"{counts[s]} {s}" for s in ("skipped", "not run") if counts[s]]
-    return f"{', '.join(parts)}. {closer or _built_in_closer(counts, len(roasts))}"
-
-
-def _built_in_closer(counts: dict[RoastStatus, int], total: int) -> str:
+    total = len(roasts)
     if counts["failed"] == total:
         mood = "all failed"
     elif counts["failed"]:

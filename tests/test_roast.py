@@ -256,10 +256,12 @@ def test_cli_roast_output_and_exit_code(suite):
 
     lines = result.output.splitlines()
     assert result.exit_code == 1
-    assert lines[0].startswith("? test_total           (")
-    assert lines[1] == "✗ test_vat_is_correct  (only checks that true is true, so it can't pass)"
-    assert lines[2].startswith("    ")
-    assert lines[-1].removeprefix("0 passed, 1 failed, 1 not run. ") in CLOSERS["some failed"]
+    assert lines[0] == "slop-test roast · 2 tests · built-in roasts"
+    assert lines[2].startswith("? test_total           not run")
+    assert lines[3] == "✗ test_vat_is_correct  only checks that true is true, so it can't pass"
+    assert lines[4].startswith("  └ ")
+    assert lines[-2] == "0 passed · 1 failed · 1 not run"
+    assert lines[-1] in CLOSERS["some failed"]
 
 
 def test_cli_roast_exits_0_when_nothing_is_weak(tmp_path):
@@ -367,5 +369,5 @@ def test_cli_gentle(suite):
     rude = runner.invoke(app, ["roast", str(suite)]).output
     gentle = runner.invoke(app, ["roast", str(suite), "--gentle"]).output
 
-    assert any(f"    {line}\n" in gentle for line in ROASTS["trivial"])
-    assert any(f"    {capitalized(line)}\n" in rude for line in DEV_ROASTS["trivial"])
+    assert any(f"  └ {line}\n" in gentle for line in ROASTS["trivial"])
+    assert any(f"  └ {capitalized(line)}\n" in rude for line in DEV_ROASTS["trivial"])

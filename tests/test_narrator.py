@@ -12,6 +12,8 @@ TEST = make_test("test_checkout")
 
 
 class FakeModel:
+    model = "fake-model"
+
     def __init__(self, line):
         self.line = line
         self.asked = []
@@ -78,13 +80,14 @@ def test_cli_prints_everything_a_model_writes(tmp_path, monkeypatch):
     result = runner.invoke(app, ["run", str(tmp_path), "--seed", "0"])
 
     assert result.output == (
+        "slop-test run · 1 test · judged by fake-model\n"
         "Presiding: a Shakespearean actor.\n"
         "\n"
-        "  Thy test hath passed.\n"
-        "~ test_checkout  (redeemed)\n"
-        "    assert cart.total == 12  # holds\n"
-        "    Dissent from an HR representative: needs improvement\n"
+        "  ↻ Thy test hath passed.\n"
+        "~ test_checkout  redeemed\n"
+        "  ├ assert cart.total == 12  # holds\n"
+        "  └ Dissent from an HR representative: needs improvement\n"
         "\n"
-        "1 passed, 0 failed, 90% vibe coverage\n"
+        "1 passed · 0 failed · vibe coverage ━━━━━━━━━━━━━━━━━━── 90%\n"
         "Thy test hath passed.\n"
     )

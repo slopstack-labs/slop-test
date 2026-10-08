@@ -107,13 +107,64 @@ def summary_line(verdicts: Sequence[Verdict]) -> str:
     return f"{passed} passed, {failed} failed, {vibe_coverage(verdicts)}% vibe coverage"
 
 
+COVERAGE_BAR_WIDTH = 20
+COUNT_COLORS = {"passed": "green", "failed": "red", "skipped": "yellow", "not run": "yellow"}
+
+
+def coverage_bar(coverage: int) -> Text:
+    """Vibe coverage as a gauge: green when it's high, red when it's low."""
+    filled = round(coverage / 100 * COVERAGE_BAR_WIDTH)
+    color = "green" if coverage >= 75 else "yellow" if coverage >= 50 else "red"
+    return Text.assemble(
+        ("━" * filled, color),
+        ("─" * (COVERAGE_BAR_WIDTH - filled), "dim"),
+        (f" {coverage}%", "bold"),
+    )
+
+
+def _counts(counts: Iterable[tuple[str, int]]) -> list[Text]:
+    """`3 passed`, `1 failed` and so on, each in its own color, or dim when it's none."""
+    return [
+        Text(f"{n} {label}", f"bold {COUNT_COLORS[label]}" if n else "dim") for label, n in counts
+    ]
+
+
+DOT = Text(" · ", "dim")
+
+
 class Reporter:
-    def __init__(self, console: Console, tests: Sequence[DiscoveredTest]) -> None:
+    def __init__(
+        self,
+        console: Console,
+        tests: Sequence[DiscoveredTest],
+        unparsable: Sequence[Path] = (),
+    ) -> None:
         self.console = console
+        self.tests = tests
+        self.unparsable = unparsable
         self.name_width = max((len(t.qualname) for t in tests), default=0)
         # Same-named tests in different files are indistinguishable without headings.
         self.show_files = len({t.file for t in tests}) > 1
         self._file: Path | None = None
+
+    def header(self, command: str, judge: str, personas: Sequence[Persona] = ()) -> None:
+        """What's about to happen, and who's doing it: `run · 9 tests · judged by the mock`."""
+        count = f"{len(self.tests)} test{'' if len(self.tests) == 1 else 's'}"
+        self.console.print(
+            Text.assemble(
+                (f"slop-test {command}", "bold"), DOT, (count, "dim"), DOT, (judge, "dim")
+            )
+        )
+        if personas:
+            self.console.print(Text(bench_line(personas), "dim italic"))
+        self.warnings()
+        self.console.print()
+
+    def warnings(self) -> None:
+        for file in self.unparsable:
+            self.console.print(
+                Text(f"! skipped {file}: could not parse it, felt nothing", "yellow")
+            )
 
     def starting(self, test: DiscoveredTest) -> None:
         """Call before judging each test, so its file heading comes before any retries."""
@@ -122,48 +173,54 @@ class Reporter:
         if self._file is not None:
             self.console.print()
         self._file = test.file
-        self.console.print(Text(f"{test.file} ({test.language})", "dim"))
-
-    def unparsable(self, file: Path) -> None:
-        self.console.print(Text(f"! skipped {file}: could not parse it, felt nothing", "yellow"))
-
-    def bench(self, personas: Sequence[Persona]) -> None:
-        self.console.print(Text(bench_line(personas), "dim"))
-        self.console.print()
+        self.console.print(Text.assemble((str(test.file), "bold"), DOT, (test.language, "dim")))
 
     def retrying(self, pep_talk: str) -> None:
-        self.console.print(Text(f"  {pep_talk}", "dim italic"))
+        self.console.print(Text.assemble(("  ↻ ", "magenta"), (pep_talk, "dim italic")))
 
     def result(self, test: DiscoveredTest, verdict: Verdict) -> None:
         self._line(test, MARKS[verdict.status], verdict.reason)
+        details = []
         if verdict.assertion:
-            self.console.print(Text(f"    {verdict.assertion}", "dim"))
+            details.append(Text(verdict.assertion, "dim"))
         if verdict.dissent:
-            self.console.print(Text(f"    Dissent from {verdict.dissent}", "italic"))
+            details.append(Text(f"Dissent from {verdict.dissent}", "italic"))
+        self._details(details)
 
     def roasted(self, test: DiscoveredTest, result: roast.Roast) -> None:
         self._line(test, ROAST_MARKS[result.status], result.headline)
-        for line in result.roasts:
-            self.console.print(Text(f"    {line}", "italic"))
+        self._details([Text(line, "italic") for line in result.roasts])
 
     def _line(self, test: DiscoveredTest, mark_and_color: tuple[str, str], why: str) -> None:
         mark, color = mark_and_color
-        line = Text.assemble(
-            (mark, f"bold {color}"),
-            f" {test.qualname.ljust(self.name_width)}  ",
-            (f"({why})", "dim"),
+        name_style = "red" if color == "red" else ""  # failures should stand out; nothing else
+        self.console.print(
+            Text.assemble(
+                (mark, f"bold {color}"),
+                " ",
+                (test.qualname.ljust(self.name_width), name_style),
+                "  ",
+                (why, "dim"),
+            )
         )
-        self.console.print(line)
+
+    def _details(self, lines: Sequence[Text]) -> None:
+        """Lines that belong to the test above, hanging off it like a tree."""
+        for i, line in enumerate(lines):
+            branch = "└ " if i == len(lines) - 1 else "├ "
+            self.console.print(Text.assemble(("  " + branch, "dim"), line))
 
     def summary(self, verdicts: Sequence[Verdict]) -> None:
-        color = "red" if any(v.failed for v in verdicts) else "green"
+        failed = sum(v.failed for v in verdicts)
+        counts = _counts([("passed", len(verdicts) - failed), ("failed", failed)])
+        coverage = Text.assemble(("vibe coverage ", "dim"), coverage_bar(vibe_coverage(verdicts)))
         self.console.print()
-        self.console.print(Text(summary_line(verdicts), f"bold {color}"))
+        self.console.print(DOT.join([*counts, coverage]))
 
     def roast_summary(self, results: Sequence[roast.Roast], closer: str | None = None) -> None:
-        color = "red" if any(r.status == "failed" for r in results) else "green"
         self.console.print()
-        self.console.print(Text(roast.summary_line(results, closer), f"bold {color}"))
+        self.console.print(DOT.join(_counts(roast.tally(results).items())))
+        self.closer(closer or roast.built_in_closer(results))
 
     def closer(self, remark: str) -> None:
         self.console.print(Text(remark, "italic"))

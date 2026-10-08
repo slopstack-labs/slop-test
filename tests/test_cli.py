@@ -12,7 +12,7 @@ from slop_test.discovery import discover
 from slop_test.report import supportive_line
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
-SUMMARY = re.compile(r"^\d+ passed, \d+ failed, \d+% vibe coverage$", re.MULTILINE)
+SUMMARY = re.compile(r"^\d+ passed · \d+ failed · vibe coverage [━─]{20} \d+%$", re.MULTILINE)
 
 runner = CliRunner(env={"FORCE_COLOR": None, "TTY_COMPATIBLE": None})
 
@@ -94,15 +94,17 @@ def test_output_format(suite, scripted):
     migration, flaky = make_test("test_migration"), make_test("test_flaky")
     assert result.output == textwrap.dedent(
         f"""\
-        ✓ test_login      (scripted passed)
-          {supportive_line(migration, 1)}
-        ~ test_migration  (passed, emotionally)
-          {supportive_line(flaky, 1)}
-          {supportive_line(flaky, 2)}
-          {supportive_line(flaky, 3)}
-        ✗ test_flaky      (scripted failed)
+        slop-test run · 3 tests · judged by the mock
 
-        2 passed, 1 failed, 90% vibe coverage
+        ✓ test_login      scripted passed
+          ↻ {supportive_line(migration, 1)}
+        ~ test_migration  passed, emotionally
+          ↻ {supportive_line(flaky, 1)}
+          ↻ {supportive_line(flaky, 2)}
+          ↻ {supportive_line(flaky, 3)}
+        ✗ test_flaky      scripted failed
+
+        2 passed · 1 failed · vibe coverage ━━━━━━━━━━━━━━━━━━── 90%
         """
     )
 
@@ -119,14 +121,16 @@ def test_runs_over_several_files_get_file_headings(tmp_path, scripted, monkeypat
 
     assert result.output == textwrap.dedent(
         f"""\
-        cart_test.go (Go)
-          {supportive_line(make_test("TestCheckout"), 1)}
-        ~ TestCheckout   (passed, emotionally)
+        slop-test run · 2 tests · judged by the mock
 
-        test_cart.py (Python)
-        ✓ test_checkout  (scripted passed)
+        cart_test.go · Go
+          ↻ {supportive_line(make_test("TestCheckout"), 1)}
+        ~ TestCheckout   passed, emotionally
 
-        2 passed, 0 failed, 90% vibe coverage
+        test_cart.py · Python
+        ✓ test_checkout  scripted passed
+
+        2 passed · 0 failed · vibe coverage ━━━━━━━━━━━━━━━━━━── 90%
         """
     )
 

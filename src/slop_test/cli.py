@@ -187,8 +187,8 @@ def run(
         jury=jury,
     )
     narrator = Narrator(bench.model)
-    if bench.narrated:
-        reporter.bench(bench.personas)
+    judged_by = f"judged by {bench.model.model}" if bench.model else "judged by the mock"
+    reporter.header("run", judged_by, bench.personas if bench.narrated else ())
 
     verdicts = []
     for test in tests:
@@ -264,7 +264,9 @@ def roast_command(
     if choose(backend_name.value) == "llm":
         judge_persona = personas.pick(persona.value, random.Random())
         model = OpenAICompatBackend.from_env(read_the_code=True, persona=judge_persona)
-        reporter.bench([judge_persona])
+        reporter.header("roast", f"roasted by {model.model}", [judge_persona])
+    else:
+        reporter.header("roast", "built-in roasts")
     narrator = Narrator(model)
 
     results = []
@@ -282,13 +284,13 @@ def roast_command(
 def _discover(
     path: Path | None, console: Console, *, verb: str
 ) -> tuple[list[DiscoveredTest], Reporter]:
-    """Find the tests under `path`, and say so when some can't be read or there are none."""
+    """Find the tests under `path`, and say so when there are none. Files that can't be read
+    are mentioned under the header, or right away if that's all there is."""
     if path is None:
         path = DEFAULT_PATH if DEFAULT_PATH.is_dir() else Path(".")
     discovery = discover(path)
-    reporter = Reporter(console, discovery.tests)
-    for file in discovery.unparsable:
-        reporter.unparsable(file)
+    reporter = Reporter(console, discovery.tests, discovery.unparsable)
     if not discovery.tests:
+        reporter.warnings()
         console.print(f"No tests found in {path}. Nothing to {verb}.")
     return discovery.tests, reporter

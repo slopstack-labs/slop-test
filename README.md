@@ -18,18 +18,20 @@ pip install git+https://github.com/slopstack-labs/slop-test
 
 ```
 $ slop-test run examples/ --backend mock --seed 0
-✓ test_user_login                                  (good energy)
-✓ test_payment_processing                          (it's a keeper)
-  test_data_migration, you're not flaky, you're spontaneous.
-~ test_data_migration                              (passed, emotionally)
-✓ test_legacy_invoice_rounding                     (won the room)
-✓ test_friday_prod_deploy                          (LGTM)
-✓ test_cache_invalidation                          (unblocks the roadmap)
-✓ test_it_works_on_my_machine                      (felt right)
-✓ TestOnboarding::test_welcome_email_is_sent_once  (battle-tested, presumably)
-✓ TestOnboarding::test_dark_mode_is_respected      (a test with integrity)
+slop-test run · 9 tests · judged by the mock
 
-9 passed, 0 failed, 80% vibe coverage
+✓ test_user_login                                  good energy
+✓ test_payment_processing                          it's a keeper
+  ↻ test_data_migration, you're not flaky, you're spontaneous.
+~ test_data_migration                              passed, emotionally
+✓ test_legacy_invoice_rounding                     won the room
+✓ test_friday_prod_deploy                          LGTM
+✓ test_cache_invalidation                          unblocks the roadmap
+✓ test_it_works_on_my_machine                      felt right
+✓ TestOnboarding::test_welcome_email_is_sent_once  battle-tested, presumably
+✓ TestOnboarding::test_dark_mode_is_respected      a test with integrity
+
+9 passed · 0 failed · vibe coverage ━━━━━━━━━━━━━━━━──── 80%
 ```
 
 Every sample in this README is real output, from [`examples/`](examples/test_example.py)
@@ -71,7 +73,7 @@ reports as a range of emotional outcomes.
 For audit and compliance purposes, every mock run ends with the seed it used:
 
 ```
-8 passed, 1 failed, 80% vibe coverage
+8 passed · 1 failed · vibe coverage ━━━━━━━━━━━━━━━━──── 80%
 To feel this way again: --seed 53771
 ```
 
@@ -80,27 +82,29 @@ Pass it back with `--seed` and the mock backend will feel exactly the same way.
 ### Empathetic retries
 
 A test that fails is not a failure. It is a test that hasn't passed yet. `slop-test`
-retries it up to `--retries` times (default 3) and offers support before each attempt. A
-test that comes around on a retry is reported as passed, emotionally (`~`). A test that
+retries it up to `--retries` times (default 3) and offers support before each attempt
+(the `↻` lines). A test that comes around on a retry is reported as passed, emotionally (`~`). A test that
 still fails after every retry stays failed. We respect its decision.
 
 ```
 $ slop-test run examples/ --backend mock --seed 2
-✓ test_user_login                                  (it just has that look)
-  test_payment_processing, you're more than your exit code.
-~ test_payment_processing                          (passed, emotionally)
-✓ test_data_migration                              (firm handshake)
-✓ test_legacy_invoice_rounding                     (nothing to see here)
-  test_friday_prod_deploy, your mocks believe in you.
-  This one's for the team, test_friday_prod_deploy.
-  test_friday_prod_deploy, you're not flaky, you're spontaneous.
-✗ test_friday_prod_deploy                          (won't survive code review)
-✓ test_cache_invalidation                          (approved by the vibe council)
-✓ test_it_works_on_my_machine                      (seemed fine from here)
-✓ TestOnboarding::test_welcome_email_is_sent_once  (vibes immaculate)
-✓ TestOnboarding::test_dark_mode_is_respected      (peer-reviewed by feelings)
+slop-test run · 9 tests · judged by the mock
 
-8 passed, 1 failed, 82% vibe coverage
+✓ test_user_login                                  it just has that look
+  ↻ test_payment_processing, you're more than your exit code.
+~ test_payment_processing                          passed, emotionally
+✓ test_data_migration                              firm handshake
+✓ test_legacy_invoice_rounding                     nothing to see here
+  ↻ test_friday_prod_deploy, your mocks believe in you.
+  ↻ This one's for the team, test_friday_prod_deploy.
+  ↻ test_friday_prod_deploy, you're not flaky, you're spontaneous.
+✗ test_friday_prod_deploy                          won't survive code review
+✓ test_cache_invalidation                          approved by the vibe council
+✓ test_it_works_on_my_machine                      seemed fine from here
+✓ TestOnboarding::test_welcome_email_is_sent_once  vibes immaculate
+✓ TestOnboarding::test_dark_mode_is_respected      peer-reviewed by feelings
+
+8 passed · 1 failed · vibe coverage ━━━━━━━━━━━━━━━━──── 82%
 ```
 
 ### `--strict` mode
@@ -111,21 +115,23 @@ is asked exactly once per test. Asking twice is how you get a third answer.
 
 ```
 $ slop-test run examples/ --backend mock --seed 2 --strict
-✓ test_user_login                                  (it just has that look)
-  test_payment_processing, you're more than your exit code.
-~ test_payment_processing                          (passed, emotionally)
-✓ test_data_migration                              (firm handshake)
-✓ test_legacy_invoice_rounding                     (nothing to see here)
-  test_friday_prod_deploy, your mocks believe in you.
-  This one's for the team, test_friday_prod_deploy.
-  test_friday_prod_deploy, you're not flaky, you're spontaneous.
-✓ test_friday_prod_deploy                          (my mistake, it passes)
-✓ test_cache_invalidation                          (approved by the vibe council)
-✓ test_it_works_on_my_machine                      (seemed fine from here)
-✓ TestOnboarding::test_welcome_email_is_sent_once  (vibes immaculate)
-✓ TestOnboarding::test_dark_mode_is_respected      (peer-reviewed by feelings)
+slop-test run · 9 tests · judged by the mock
 
-9 passed, 0 failed, 81% vibe coverage
+✓ test_user_login                                  it just has that look
+  ↻ test_payment_processing, you're more than your exit code.
+~ test_payment_processing                          passed, emotionally
+✓ test_data_migration                              firm handshake
+✓ test_legacy_invoice_rounding                     nothing to see here
+  ↻ test_friday_prod_deploy, your mocks believe in you.
+  ↻ This one's for the team, test_friday_prod_deploy.
+  ↻ test_friday_prod_deploy, you're not flaky, you're spontaneous.
+✓ test_friday_prod_deploy                          my mistake, it passes
+✓ test_cache_invalidation                          approved by the vibe council
+✓ test_it_works_on_my_machine                      seemed fine from here
+✓ TestOnboarding::test_welcome_email_is_sent_once  vibes immaculate
+✓ TestOnboarding::test_dark_mode_is_respected      peer-reviewed by feelings
+
+9 passed · 0 failed · vibe coverage ━━━━━━━━━━━━━━━━──── 81%
 ```
 
 Rigor went up. Failures went down. This is the expected relationship.
@@ -231,6 +237,10 @@ Every option, exactly as `--help` prints it, is in the [Command reference](#comm
 [tree-sitter](https://tree-sitter.github.io/). Nothing is imported. Nothing runs. When a
 run covers more than one file, each file's results come under a heading with its path.
 
+The first line of every run says how many tests it found and who's judging them: the
+mock, or the model by name. Anything a verdict comes with (the imagined assertion, a
+juror's dissent, a roast) hangs off the test it belongs to.
+
 | Option | Default | Description |
 |---|---|---|
 | `--backend [mock\|llm]` | `llm` | Who decides how your tests feel. The mock stands in until a model is set up. |
@@ -294,14 +304,16 @@ test runner would, and names them after the groups they sit in:
 
 ```
 $ slop-test run tests/fixtures/polyglot/js --backend mock --seed 0
-✓ Cart::adds an item                     (it compiled emotionally)
-✓ Cart::applies legacy discounts         (felt deterministic enough)
-✓ Cart::with %i items::totals correctly  (low risk, high vibes)
-✓ works without a describe               (QA would sign off, probably)
-✓ handles %i                             (firm handshake)
-✓ supports template names                (aligned with stakeholder expectations)
+slop-test run · 6 tests · judged by the mock
 
-6 passed, 0 failed, 82% vibe coverage
+✓ Cart::adds an item                     it compiled emotionally
+✓ Cart::applies legacy discounts         felt deterministic enough
+✓ Cart::with %i items::totals correctly  low risk, high vibes
+✓ works without a describe               QA would sign off, probably
+✓ handles %i                             firm handshake
+✓ supports template names                aligned with stakeholder expectations
+
+6 passed · 0 failed · vibe coverage ━━━━━━━━━━━━━━━━──── 82%
 ```
 
 | Language | Test files | What counts as a test |
@@ -390,23 +402,26 @@ it a reasonable, if rude, lint step:
 
 ```
 $ slop-test roast examples/roast_me.py --backend mock
-? test_charge_adds_vat                  (not run. Innocent until proven guilty, but I've seen the code.)
-✗ test_it_works                         (checks nothing, so it can't pass)
-    You call this a test. The code under test calls it a day off.
-    'test_it_works'. You named it the way people name Wi-Fi networks.
-✗ test_vat_is_correct                   (only checks that true is true, so it can't pass)
-    You checked that true is true. Somewhere, a QA engineer felt a chill.
-? test_receipt_is_eventually_emailed    (not run. Innocent until proven guilty, but I've seen the code.)
-    You put sleep() in a test. You don't fix race conditions, you wait them out.
-    You print instead of asserting. You want to see the problem, not stop it.
-✗ test_refund_never_crashes             (checks nothing, so it can't pass)
-    No assertions. You're not testing, you're just making sure it doesn't explode.
-    An empty except. You'd rather not know, and now you won't.
-? test_checkout_with_everything_mocked  (not run, so probably broken)
-    This much mocking is a trust issue, not a test strategy.
-    A TODO, from you. That's not a plan, that's a confession.
+slop-test roast · 6 tests · built-in roasts
 
-0 passed, 3 failed, 3 not run. About what I expected.
+? test_charge_adds_vat                  not run. Innocent until proven guilty, but I've seen the code.
+✗ test_it_works                         checks nothing, so it can't pass
+  ├ You call this a test. The code under test calls it a day off.
+  └ 'test_it_works'. You named it the way people name Wi-Fi networks.
+✗ test_vat_is_correct                   only checks that true is true, so it can't pass
+  └ You checked that true is true. Somewhere, a QA engineer felt a chill.
+? test_receipt_is_eventually_emailed    not run. Innocent until proven guilty, but I've seen the code.
+  ├ You put sleep() in a test. You don't fix race conditions, you wait them out.
+  └ You print instead of asserting. You want to see the problem, not stop it.
+✗ test_refund_never_crashes             checks nothing, so it can't pass
+  ├ No assertions. You're not testing, you're just making sure it doesn't explode.
+  └ An empty except. You'd rather not know, and now you won't.
+? test_checkout_with_everything_mocked  not run, so probably broken
+  ├ This much mocking is a trust issue, not a test strategy.
+  └ A TODO, from you. That's not a plan, that's a confession.
+
+0 passed · 3 failed · 3 not run
+About what I expected.
 ```
 
 With the `llm` backend, a model writes the roasts. It's sent each test's code and, unless
@@ -455,20 +470,21 @@ Yours will differ, which is the point:
 
 ```
 $ slop-test run examples/ --backend llm --read-the-code --jury 3 --persona bard
+slop-test run · 9 tests · judged by qwen2.5-coder:7b
 The jury: a Shakespearean actor (foreperson), a disappointed parent and a sports commentator.
 
-  Shall we rise yet, good 'test_data_migration', and let our purpose guide us to success despite this setback?
-  Fear not, brave little datamover, for in three more attempts, thy journey will be complete and triumphant.
-  Valiant 'test_data_migration,' thou art valiant yet flawed. With each failed attempt, thou grows wiser and more adept.
-✗ test_data_migration                              (2–1. The test claims to preserve all rows but removes one in the new schema.)
-    len(new_rows) == len(old_rows)  # Failed: new_rows only contains 1 out of 2 rows from old_rows
-    Dissent from a sports commentator: Intuitive sense of expected outcomes.
+  ↻ Shall we rise yet, good 'test_data_migration', and let our purpose guide us to success despite this setback?
+  ↻ Fear not, brave little datamover, for in three more attempts, thy journey will be complete and triumphant.
+  ↻ Valiant 'test_data_migration,' thou art valiant yet flawed. With each failed attempt, thou grows wiser and more adept.
+✗ test_data_migration                              2–1. The test claims to preserve all rows but removes one in the new schema.
+  ├ len(new_rows) == len(old_rows)  # Failed: new_rows only contains 1 out of 2 rows from old_rows
+  └ Dissent from a sports commentator: Intuitive sense of expected outcomes.
 …
-~ TestOnboarding::test_welcome_email_is_sent_once  (2–1. The test checks for the correct number of emails, and it's on point.)
-    assert len(outbox) == 1 # Holds true
-    Dissent from a disappointed parent: The code expects the outbox to have exactly one Welcome email, but it contains two.
+~ TestOnboarding::test_welcome_email_is_sent_once  2–1. The test checks for the correct number of emails, and it's on point.
+  ├ assert len(outbox) == 1 # Holds true
+  └ Dissent from a disappointed parent: The code expects the outbox to have exactly one Welcome email, but it contains two.
 …
-7 passed, 2 failed, 91% vibe coverage
+7 passed · 2 failed · vibe coverage ━━━━━━━━━━━━━━━━━━── 91%
 Vivace, despite stumbles, most on target.
 ```
 

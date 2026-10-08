@@ -2,7 +2,13 @@ import pytest
 from fakes import make_test
 
 from slop_test.judge import Verdict
-from slop_test.report import SUPPORTIVE_LINES, summary_line, supportive_line, vibe_coverage
+from slop_test.report import (
+    SUPPORTIVE_LINES,
+    coverage_bar,
+    summary_line,
+    supportive_line,
+    vibe_coverage,
+)
 
 
 def passed(confidence):
@@ -38,6 +44,24 @@ def test_summary_line_counts_emotional_passes_as_passes():
     verdicts = [passed(0.9), emotional(0.8), failed(0.1)]
 
     assert summary_line(verdicts) == "2 passed, 1 failed, 85% vibe coverage"
+
+
+@pytest.mark.parametrize(
+    ("coverage", "plain", "color"),
+    [
+        (0, "─" * 20 + " 0%", "red"),
+        (49, "━" * 10 + "─" * 10 + " 49%", "red"),
+        (50, "━" * 10 + "─" * 10 + " 50%", "yellow"),
+        (82, "━" * 16 + "─" * 4 + " 82%", "green"),
+        (100, "━" * 20 + " 100%", "green"),
+    ],
+)
+def test_coverage_bar(coverage, plain, color):
+    bar = coverage_bar(coverage)
+
+    assert bar.plain == plain
+    if coverage:
+        assert str(bar.spans[0].style) == color  # the filled part
 
 
 def test_supportive_lines_name_the_test_and_never_repeat_until_they_run_out():
