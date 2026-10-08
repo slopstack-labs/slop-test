@@ -95,6 +95,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=personas.RANDOM,
         help="Whose voice a model roasts in. Default: a new one each run.",
     )
+    group.addoption(
+        "--roast-gentle",
+        action="store_true",
+        help="Roast the code, not whoever wrote it.",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -194,6 +199,7 @@ class RoastPlugin:
             persona = personas.pick(config.getoption("roast_persona"), random.Random())
             self.model = OpenAICompatBackend.from_env(read_the_code=True, persona=persona)
         self.narrator = Narrator(self.model)
+        self.gentle: bool = config.getoption("roast_gentle")
         self.results: dict[str, roast.Roast] = {}
 
     @pytest.hookimpl(wrapper=True)
@@ -209,7 +215,9 @@ class RoastPlugin:
             "passed" if report.passed else "skipped" if report.skipped else "failed"
         )
         duration = report.duration if report.when == "call" else None
-        result = roast.roast(as_discovered(item), outcome, duration=duration, model=self.model)
+        result = roast.roast(
+            as_discovered(item), outcome, duration=duration, model=self.model, gentle=self.gentle
+        )
         if result.status == "failed" and report.passed:
             report.outcome = "failed"
             report.longrepr = "\n".join((_sentence(result.headline), *result.roasts))

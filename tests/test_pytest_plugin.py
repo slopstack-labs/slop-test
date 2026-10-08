@@ -8,7 +8,7 @@ from fakes import ScriptedBackend, patch_bench
 from slop_test.backends.mock import MockBackend
 from slop_test.discovery import discover
 from slop_test.judge import judge
-from slop_test.roast import ROASTS
+from slop_test.roast import DEV_ROASTS, ROASTS
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 WORDS = {"passed": "PASSED", "passed_emotionally": "PASSED EMOTIONALLY", "failed": "FAILED"}
@@ -280,7 +280,7 @@ def test_roast_mentions_slow_tests(pytester, monkeypatch):
 
     result = pytester.runpytest("--roast")
 
-    assert "Took 0.0s" in result.stdout.str()
+    assert "0.0s." in result.stdout.str()
 
 
 @pytest.mark.parametrize("name", ["llm", "openai"])
@@ -292,7 +292,7 @@ def test_roast_with_an_unconfigured_model_uses_built_in_roasts(pytester, monkeyp
     result = pytester.runpytest("--roast", f"--roast-backend={name}")
 
     result.assert_outcomes(failed=1)
-    assert any(line in result.stdout.str() for line in ROASTS["no_assertions"])
+    assert any(capitalized(line) in result.stdout.str() for line in DEV_ROASTS["no_assertions"])
 
 
 def test_vibes_and_roast_cannot_both_be_on(pytester):
@@ -311,3 +311,16 @@ def test_without_roast_weak_tests_pass_as_usual(pytester):
 
     result.assert_outcomes(passed=1)
     assert "= roast =" not in result.stdout.str()
+
+
+def capitalized(line):
+    return line[:1].upper() + line[1:]
+
+
+def test_roast_gentle_sticks_to_the_code(pytester):
+    pytester.makepyfile("def test_checks_nothing():\n    sum([1, 2])\n")
+
+    result = pytester.runpytest("--roast", "--roast-gentle")
+
+    result.assert_outcomes(failed=1)
+    assert any(line in result.stdout.str() for line in ROASTS["no_assertions"])

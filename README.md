@@ -288,26 +288,26 @@ $ pytest examples/roast_me.py -q --roast --tb=no
 ==================================== roast =====================================
 ✓ examples/roast_me.py::test_charge_adds_vat: passed, somehow
 ✗ examples/roast_me.py::test_it_works: passed, but it checks nothing
-    This test asserts nothing. It's not a test, it's a wish.
-    Named 'test_it_works'. Very descriptive. Of nothing.
+    Lars, you wrote this to make the test count go up, not to find bugs. It worked.
+    You named it 'test_it_works'. Naming things is hard, and you didn't even try.
 ✗ examples/roast_me.py::test_vat_is_correct: passed, but only proves that true is true
-    It checks that true is true. Bold, but not useful.
+    Lars, you made the test pass by testing nothing. Management would be proud.
 ✓ examples/roast_me.py::test_receipt_is_eventually_emailed: passed. For now.
-    Sleeps in a test. That's a race condition taking a nap.
-    Took 1.1s. That's not a unit test, that's a commute.
-    Left a debug print in. Nobody is reading that.
+    Lars, you put sleep() in a test. You don't fix race conditions, you wait them out.
+    1.1s. You run this and go make coffee, don't you.
+    You debug with print() and leave the evidence at the scene.
 ✗ examples/roast_me.py::test_refund_never_crashes: passed, but it checks nothing
-    No assertions. It would still pass if you deleted the code it tests.
-    Catches an exception and does nothing with it. Very zen. Very wrong.
+    Lars, you wrote a test that checks nothing, then went to lunch.
+    You catch exceptions and do nothing with them. Very healthy. Very you.
 ✓ examples/roast_me.py::test_checkout_with_everything_mocked: passed. Suspicious.
-    Mostly mocks. You're testing that your mocks work. They do.
-    Has a TODO in it. So does everything else you've written.
+    Lars, you mocked everything so nothing could hurt you. Your therapist would like a word.
+    You left a TODO. We both know you're never coming back for it.
 3 passed, 3 failed. About what I expected.
 =========================== short test summary info ============================
-FAILED examples/roast_me.py::test_it_works - It passed, but it checks nothing.
-FAILED examples/roast_me.py::test_vat_is_correct - It passed, but only proves...
-FAILED examples/roast_me.py::test_refund_never_crashes - It passed, but it ch...
-3 failed, 3 passed in 1.12s
+FAILED examples/roast_me.py::test_it_works - Passed, but it checks nothing.
+FAILED examples/roast_me.py::test_vat_is_correct - Passed, but only proves th...
+FAILED examples/roast_me.py::test_refund_never_crashes - Passed, but it check...
+3 failed, 3 passed in 1.20s
 ```
 
 Real failures stay failures, with pytest's usual tracebacks. Tests that pass without
@@ -316,6 +316,11 @@ checking anything fail too: no assertions, or only assertions that can't fail
 roast for each thing that deserves one: `sleep()`, debug prints, swallowed exceptions,
 more mocks than code, TODOs, tests over 40 lines or a second, and names like
 `test_it_works`.
+
+The roasts aren't aimed at the code. They're aimed at whoever wrote it. `slop-test` asks
+`git blame` who last touched each test, and when, by their own clock, and adds a jab
+for anything committed on a Friday afternoon, at the weekend, after 22:00, or not at all.
+`--gentle` (`--roast-gentle` under pytest) points the roasts back at the code.
 
 `slop-test roast` does the reading without the running, in all 22
 [supported languages](#supported-languages). Tests that check nothing fail. Everything
@@ -326,25 +331,28 @@ it a reasonable, if rude, lint step:
 $ slop-test roast examples/roast_me.py
 ? test_charge_adds_vat                  (not run. Assume the worst.)
 ✗ test_it_works                         (checks nothing, so it can't pass)
-    This test asserts nothing. It's not a test, it's a wish.
-    Named 'test_it_works'. Very descriptive. Of nothing.
+    Lars, you wrote this to make the test count go up, not to find bugs. It worked.
+    You named it 'test_it_works'. Naming things is hard, and you didn't even try.
 ✗ test_vat_is_correct                   (only checks that true is true, so it can't pass)
-    It checks that true is true. Bold, but not useful.
+    Lars, you made the test pass by testing nothing. Management would be proud.
 ? test_receipt_is_eventually_emailed    (not run. Assume the worst.)
-    Sleeps in a test. That's a race condition taking a nap.
-    Left a debug print in. Nobody is reading that.
+    Lars, you put sleep() in a test. You don't fix race conditions, you wait them out.
+    You debug with print() and leave the evidence at the scene.
 ✗ test_refund_never_crashes             (checks nothing, so it can't pass)
-    No assertions. It would still pass if you deleted the code it tests.
-    Catches an exception and does nothing with it. Very zen. Very wrong.
+    Lars, you wrote a test that checks nothing, then went to lunch.
+    You catch exceptions and do nothing with them. Very healthy. Very you.
 ? test_checkout_with_everything_mocked  (not run, so probably broken)
-    Mostly mocks. You're testing that your mocks work. They do.
-    Has a TODO in it. So does everything else you've written.
+    Lars, you mocked everything so nothing could hurt you. Your therapist would like a word.
+    You left a TODO. We both know you're never coming back for it.
 
 0 passed, 3 failed, 3 not run. About what I expected.
 ```
 
-With the `llm` backend, a model writes the roasts and is sent each test's code to do
-it. It doesn't get a say in what passes. If it can't be reached, or replies with
+With the `llm` backend, a model writes the roasts. It's sent each test's code and, unless
+you're being gentle, the name and commit time of whoever wrote it, so mind where your
+endpoint lives. It's told to go after habits, shortcuts and coping mechanisms, never
+anything outside the code and its history, and to say "you" rather than guess anyone's
+pronouns. It doesn't get a say in what passes. If it can't be reached, or replies with
 something that isn't a roast, the built-in roasts take over.
 
 | Command or option | Default | Description |
@@ -352,9 +360,11 @@ something that isn't a roast, the built-in roasts take over.
 | `slop-test roast [PATH]` | | Read and roast every test under `PATH`. Runs nothing. |
 | `--backend [mock\|llm]` | `mock` | Who writes the roasts: built-in lines, or a model. |
 | `--persona NAME` | random | Whose voice the model roasts in. |
+| `--gentle` | off | Roast the code, not whoever wrote it. |
 | `pytest --roast` | off | Run tests for real, fail the ones that check nothing, roast the rest. |
 | `--roast-backend={mock,llm}` | `mock` | Who writes the roasts under pytest. |
 | `--roast-persona=NAME` | random | Whose voice the model roasts in under pytest. |
+| `--roast-gentle` | off | Roast the code, not whoever wrote it, under pytest. |
 
 ---
 

@@ -1,14 +1,37 @@
 import textwrap
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fakes import make_test
 from typer.testing import CliRunner
 
 from slop_test.backends.openai_compat import ModelRoast
+from slop_test.blame import Blame
 from slop_test.cli import app
-from slop_test.roast import CLOSERS, HEADLINES, ROASTS, Roast, critique, roast, summary_line
+from slop_test.roast import (
+    CLOSERS,
+    DEV_ROASTS,
+    HEADLINES,
+    ROASTS,
+    WHEN_ROASTS,
+    Roast,
+    critique,
+    roast,
+    summary_line,
+)
 
 runner = CliRunner(env={"FORCE_COLOR": None, "TTY_COMPATIBLE": None})
+
+
+@pytest.fixture(autouse=True)
+def nobody_to_blame(monkeypatch):
+    """Keep these tests independent of this repo's git history; tests that want a culprit
+    set one."""
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: None)
+
+
+def capitalized(line):
+    return line[:1].upper() + line[1:]
 
 
 def code(name, source, language="Python"):
@@ -155,8 +178,8 @@ class FakeModel:
         self.reply = reply
         self.calls = []
 
-    def roast(self, test, *, verdict, findings):
-        self.calls.append((test.name, verdict, findings))
+    def roast(self, test, *, verdict, findings, who=None, gentle=False):
+        self.calls.append((test.name, verdict, findings, who, gentle))
         return self.reply
 
 
@@ -168,7 +191,9 @@ def test_a_model_writes_the_headline_and_roasts_when_it_can():
     assert result.headline == "Dead on arrival"
     assert result.roasts == ("Bespoke insult.",)
     assert result.status == "failed"  # the model writes jokes, not verdicts
-    assert model.calls == [("test_charge", "passed, but it checks nothing", ["no_assertions"])]
+    assert model.calls == [
+        ("test_charge", "passed, but it checks nothing", ["no_assertions"], None, False)
+    ]
 
 
 def test_built_in_lines_fill_in_whatever_the_model_left_out():
@@ -185,7 +210,7 @@ def test_built_in_roasts_take_over_when_the_model_cant():
     result = roast(EMPTY, model=FakeModel(None))
 
     assert result == roast(EMPTY)
-    assert result.roasts[0] in ROASTS["no_assertions"]
+    assert result.roasts[0] in [capitalized(line) for line in DEV_ROASTS["no_assertions"]]
 
 
 def verdicts(*statuses):
@@ -254,3 +279,89 @@ def test_cli_roast_with_an_unconfigured_model_uses_built_in_roasts(suite, monkey
     presiding, blank, *rest = with_model.output.splitlines(keepends=True)
     assert presiding.startswith("Presiding: ")
     assert "".join(rest) == runner.invoke(app, ["roast", str(suite)]).output
+
+
+def at(day, hour):
+    """A moment in October 2026, when the 5th was a Monday."""
+    return datetime(2026, 10, day, hour, 14, tzinfo=timezone(timedelta(hours=2)))
+
+
+SMELLY = code("test_x", "def test_x():\n    print(go())\n    time.sleep(1)\n")
+
+
+def test_roasts_go_after_whoever_last_touched_the_test(monkeypatch):
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame("Lars", at(7, 11)))
+
+    result = roast(SMELLY)
+
+    assert len(result.roasts) == len(critique(SMELLY)) == 3
+    assert result.roasts[0].startswith("Lars, you ")
+    assert not any("Lars" in line for line in result.roasts[1:])  # once is plenty
+
+
+def test_without_git_the_roasts_just_say_you():
+    result = roast(SMELLY)
+
+    assert result.roasts[0] in [capitalized(line) for line in DEV_ROASTS["no_assertions"]]
+
+
+@pytest.mark.parametrize(
+    ("moment", "jab", "detail"),
+    [
+        (at(9, 17), "friday", "17:14"),
+        (at(10, 11), "weekend", "Saturday"),
+        (at(7, 1), "late", "01:14"),
+    ],
+)
+def test_commit_times_get_jabs(monkeypatch, moment, jab, detail):
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame("Lars", moment))
+
+    [line] = roast(GOOD).roasts
+
+    assert detail in line
+    expected = [o.format(time=f"{moment:%H:%M}", day=f"{moment:%A}") for o in WHEN_ROASTS[jab]]
+    assert line.removeprefix("Lars, ") in expected
+
+
+def test_uncommitted_tests_get_a_jab_without_a_name(monkeypatch):
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame(None, None))
+
+    [line] = roast(GOOD).roasts
+
+    assert line in [capitalized(o) for o in WHEN_ROASTS["uncommitted"]]
+
+
+def test_an_ordinary_commit_time_is_not_worth_mentioning(monkeypatch):
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: Blame("Lars", at(7, 11)))
+
+    assert roast(GOOD).roasts == ()
+
+
+def test_gentle_roasts_stick_to_the_code(monkeypatch):
+    def no_blaming(test):
+        raise AssertionError("gentle roasts shouldn't ask git who did it")
+
+    monkeypatch.setattr("slop_test.roast.blame", no_blaming)
+
+    result = roast(SMELLY, gentle=True)
+
+    assert result.roasts[0] in ROASTS["no_assertions"]
+
+
+def test_the_model_hears_who_did_it(monkeypatch):
+    model = FakeModel(None)
+    culprit = Blame("Lars", at(9, 17))
+    monkeypatch.setattr("slop_test.roast.blame", lambda test: culprit)
+
+    roast(EMPTY, model=model)
+    roast(EMPTY, model=model, gentle=True)
+
+    assert [(who, gentle) for *_, who, gentle in model.calls] == [(culprit, False), (None, True)]
+
+
+def test_cli_gentle(suite):
+    rude = runner.invoke(app, ["roast", str(suite)]).output
+    gentle = runner.invoke(app, ["roast", str(suite), "--gentle"]).output
+
+    assert any(f"    {line}\n" in gentle for line in ROASTS["trivial"])
+    assert any(f"    {capitalized(line)}\n" in rude for line in DEV_ROASTS["trivial"])

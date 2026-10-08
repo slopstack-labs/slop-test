@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 import httpx
 import pytest
@@ -8,6 +9,7 @@ from slop_test.backends import get_backend
 from slop_test.backends.openai_compat import (
     ARE_YOU_SURE,
     FALLBACK,
+    GENTLE_ROAST_TASK,
     MAX_ASSERTION_LENGTH,
     MAX_LINE_LENGTH,
     MAX_REASON_LENGTH,
@@ -17,6 +19,7 @@ from slop_test.backends.openai_compat import (
     ModelRoast,
     OpenAICompatBackend,
 )
+from slop_test.blame import Blame
 from slop_test.judge import Verdict
 from slop_test.personas import PERSONAS
 
@@ -444,3 +447,35 @@ def test_single_quoted_values_are_forgiven():
         "It's either dark or light!",
         'assert "dark" in {"dark", "light"}  # Holds',
     )
+
+
+def test_roasting_the_developer_tells_the_model_who_did_it():
+    requests = []
+    culprit = Blame("Lars", datetime(2026, 10, 9, 17, 42, tzinfo=timezone.utc))
+
+    make_backend(replying('{"headline": "Busted"}', requests)).roast(
+        TEST, verdict="passed", findings=[], who=culprit
+    )
+    make_backend(replying('{"headline": "Busted"}', requests)).roast(
+        TEST, verdict="passed", findings=[], who=culprit, gentle=True
+    )
+
+    rude, gentle = (json.loads(r.content)["messages"] for r in requests)
+    assert rude[0]["content"] == ROAST_TASK
+    assert "Written by: Lars, last committed on a Friday at 17:42" in rude[-1]["content"]
+    assert gentle[0]["content"] == GENTLE_ROAST_TASK
+    assert "Written by" not in gentle[-1]["content"]
+
+
+@pytest.mark.parametrize(
+    ("who", "described"),
+    [(None, "unknown"), (Blame(None, None), "nobody yet: it isn't even committed")],
+)
+def test_roasting_without_a_known_culprit(who, described):
+    requests = []
+
+    make_backend(replying('{"headline": "Busted"}', requests)).roast(
+        TEST, verdict="passed", findings=[], who=who
+    )
+
+    assert f"Written by: {described}" in json.loads(requests[0].content)["messages"][-1]["content"]

@@ -184,11 +184,18 @@ def roast_command(
         ),
     ] = BackendName.mock,
     persona: PersonaOption = PersonaName.random,
+    gentle: Annotated[
+        bool,
+        typer.Option("--gentle", help="Roast the code, not whoever wrote it."),
+    ] = False,
 ) -> None:
     """Read every test under PATH and say what's wrong with it. Nothing is run.
 
     Tests that don't check anything fail. Everything else is assumed broken until
     proven otherwise. To prove it, run Python tests with pytest --roast.
+
+    The roasts are aimed at whoever last touched each test, according to git blame.
+    --gentle aims them at the code instead.
 
     --backend llm sends each test's code to SLOP_TEST_BASE_URL, and the model writes the
     headlines, roasts and closing remark in the voice of --persona.
@@ -210,7 +217,7 @@ def roast_command(
     results = []
     for test in tests:
         reporter.starting(test)
-        result = roasting.roast(test, model=model)
+        result = roasting.roast(test, model=model, gentle=gentle)
         reporter.roasted(test, result)
         results.append(result)
     reporter.roast_summary(results, narrator.closer(roasting.summary_line(results)))
