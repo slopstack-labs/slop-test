@@ -155,6 +155,66 @@ its other dev dependencies:
 pip install git+https://github.com/slopstack-labs/slop-test
 ```
 
+No pipx? On macOS, `brew install pipx && pipx ensurepath`, then open a new terminal.
+Elsewhere, `python3 -m pip install --user pipx`.
+
+Or run it from a clone, without installing it anywhere:
+
+```bash
+git clone https://github.com/slopstack-labs/slop-test && cd slop-test
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+alias slop-test="$PWD/.venv/bin/slop-test"
+```
+
+An alias, like an `export`, only lasts for the terminal tab you ran it in. Put it in
+`~/.zshrc` (or `~/.bashrc`) to have it in every tab.
+
+### Quickstart: your own repo
+
+Ready to paste, from instant and offline to slow and model-driven. Start in the repo:
+
+```bash
+cd ~/path/to/your/repo
+```
+
+Judge everything offline, then roast it, then let a mock jury argue about it:
+
+```bash
+slop-test run
+```
+
+```bash
+slop-test roast
+```
+
+```bash
+slop-test run --jury 3
+```
+
+To bring in a model, [run one locally](#running-a-model-locally) and point
+`slop-test` at it, in the same terminal tab:
+
+```bash
+export SLOP_TEST_BASE_URL=http://localhost:11434/v1 SLOP_TEST_MODEL=gemma3:12b
+```
+
+Then try one file before the whole suite, since every test is a model call or several:
+
+```bash
+slop-test roast tests/test_api.py --backend llm --persona parent
+```
+
+```bash
+slop-test run --backend llm --read-the-code --jury 3 --persona sommelier
+```
+
+For a Python project, `pytest --roast` actually runs the tests. Install `slop-test` into
+the project's environment first (see above), then:
+
+```bash
+pytest --roast --roast-backend=llm --roast-persona=bard
+```
+
 ### CLI
 
 ```bash
@@ -164,6 +224,7 @@ slop-test --version
 ```
 
 `roast` is covered in [Roast mode](#roast-mode). The rest of this section is about `run`.
+Every option, exactly as `--help` prints it, is in the [Command reference](#command-reference).
 
 `PATH` defaults to `tests/` if it exists, and to the current directory if it doesn't.
 `slop-test` reads every test it finds there, in any of the
@@ -462,6 +523,228 @@ Each juror is a separate model call, and so is every pep talk, so a jury of thre
 small local model takes a minute or two for a dozen tests.
 
 This backend used to be called `openai`, and that name still works everywhere.
+
+#### Running a model locally
+
+[Ollama](https://ollama.com) is the easiest way: free, offline, and nothing leaves your
+machine. On macOS:
+
+```bash
+brew install ollama && brew services start ollama
+```
+
+```bash
+ollama pull gemma3:12b
+```
+
+```bash
+export SLOP_TEST_BASE_URL=http://localhost:11434/v1 SLOP_TEST_MODEL=gemma3:12b
+```
+
+`slop-test` makes a lot of small calls, so a mid-sized model is the sweet spot. What we
+found running these on an M4 Max with 36 GB:
+
+| Model | Size | How it went |
+|---|---|---|
+| `gemma3:12b` | 8 GB | Recommended. Valid JSON in every run we tried, and the funniest by a distance. About 3 s per roast, 10 s per test with a jury of 3. |
+| `qwen2.5-coder:7b` | 5 GB | Faster and good at reading code, but garbles its JSON now and then, so some verdicts fall back to "model unavailable". Flatter jokes. |
+
+Avoid "thinking" models, which reason out loud before answering: slow, and their
+musings get in the way of the JSON. Anything over about 30B fits in memory but makes a
+jury run take forever. LM Studio works too: start its server and use
+`SLOP_TEST_BASE_URL=http://localhost:1234/v1` with the model name it shows.
+
+---
+
+## Command reference
+
+Everything `--help` says, for every command. A test keeps this in sync with the real
+output.
+
+```
+$ slop-test --help
+ Usage: root [OPTIONS] COMMAND [ARGS]...
+
+ Assertion-free testing. Your tests pass when they feel like they passed.
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --version          Show the version and exit.                                                    │
+│ --help             Show this message and exit.                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────────────────────────╮
+│ run    Judge every test under PATH by how it feels. No test code is imported or run.             │
+│ roast  Read every test under PATH and say what's wrong with it. Nothing is run.                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Run `slop-test COMMAND --help` for a command's options. In a Python project, the same features
+ work under pytest: `pytest --vibes` and `pytest --roast`.
+```
+
+```
+$ slop-test run --help
+ Usage: root run [OPTIONS] [PATH]
+
+ Judge every test under PATH by how it feels. No test code is imported or run.
+
+ Reads tests written in Python, JavaScript, TypeScript, Go, Rust, Java, Kotlin, C#,
+ Ruby, PHP, Swift, Scala, C, C++, Elixir, Dart, Zig, Lua, Haskell, Julia, OCaml and F#.
+
+ Vibe coverage is the mean confidence of every test that did not fail.
+ It has no relation to line coverage.
+
+ With --backend llm, the model writes everything: each verdict and its reason, the
+ assertion it imagines the test makes, pep talks and a closing remark, all in the
+ voice of --persona.
+
+ Exits 0, always, unless --honest-exit-codes is set.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────────────────────────╮
+│   PATH      <path>  Test file or directory to read. Default: tests/ if it exists, otherwise the  │
+│                     current directory.                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --backend                  <mock|llm|openai>                  Who judges. mock: an offline coin  │
+│                                                               flip with stock reasons. llm: a    │
+│                                                               model (see below) writes every     │
+│                                                               verdict, reason and pep talk.      │
+│                                                               openai is an old name for llm.     │
+│                                                               [default: mock]                    │
+│ --retries                  <int range> [x>=0]                 How many more tries a failed test  │
+│                                                               gets, each after a pep talk. A     │
+│                                                               test that passes on a retry passed │
+│                                                               emotionally (~).                   │
+│                                                               [default: 3]                       │
+│ --strict                                                      After each verdict, ask "Are you   │
+│                                                               sure?" once. The answer is final,  │
+│                                                               and often a reversal.              │
+│ --seed                     <int>                              Makes the mock backend's verdicts  │
+│                                                               reproducible. Without it, every    │
+│                                                               run is different and ends by       │
+│                                                               printing the seed it used.         │
+│ --read-the-code                                               Send each test's code to the       │
+│                                                               model, not just its name and       │
+│                                                               docstring. llm only.               │
+│ --persona                  <random|therapist|founder|comment  Whose voice the model judges in.   │
+│                            ator|parent|bard|hr|detective|som  llm only. random picks a new one   │
+│                            melier>                            each run; with --jury, this one is │
+│                                                               the foreperson.                    │
+│                                                               [default: random]                  │
+│ --jury                     <int range> [1<=x<=8]              How many judges each test gets,    │
+│                                                               each a different persona. The      │
+│                                                               majority wins, the losing side     │
+│                                                               dissents, and a tie is a hung jury │
+│                                                               (passes emotionally). Works        │
+│                                                               offline with the mock too.         │
+│                                                               [default: 1]                       │
+│ --honest-exit-codes                                           Exit 1 if any test failed. Without │
+│                                                               it, slop-test always exits 0.      │
+│ --help                                                        Show this message and exit.        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ With --backend llm, these environment variables say which model to use. Any
+ OpenAI-compatible endpoint works, local (Ollama, LM Studio) or hosted.
+
+   SLOP_TEST_BASE_URL     API root, e.g. http://localhost:11434/v1 for Ollama
+   SLOP_TEST_MODEL        model name, e.g. gemma3:12b
+   SLOP_TEST_API_KEY      sent as a bearer token; not needed for local servers
+   SLOP_TEST_TEMPERATURE  sampling temperature, default 1.0
+```
+
+```
+$ slop-test roast --help
+ Usage: root roast [OPTIONS] [PATH]
+
+ Read every test under PATH and say what's wrong with it. Nothing is run.
+
+ Tests that don't check anything fail. Everything else is assumed broken until
+ proven otherwise. To prove it, run Python tests with pytest --roast.
+
+ The roasts go after whoever wrote each test, as "you", never by name. git blame is
+ only asked when the test was last committed, for jabs about Friday afternoons,
+ weekends, late nights and uncommitted work. --gentle roasts the code instead.
+
+ With --backend llm, each test's code is sent to the model, which writes the
+ headlines, roasts and closing remark in the voice of --persona.
+
+ Exits 1 if any test failed.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────────────────────────╮
+│   PATH      <path>  Test file or directory to read. Default: tests/ if it exists, otherwise the  │
+│                     current directory.                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --backend        <mock|llm|openai>                       Who writes the roasts. mock: built-in   │
+│                                                          lines, offline. llm: a model (see       │
+│                                                          below) writes headlines, roasts and a   │
+│                                                          closing remark. Pass/fail is decided    │
+│                                                          either way by slop-test's own checks.   │
+│                                                          openai is an old name for llm.          │
+│                                                          [default: mock]                         │
+│ --persona        <random|therapist|founder|commentator|  Whose voice the model roasts in. llm    │
+│                  parent|bard|hr|detective|sommelier>     only. random picks a new one each run.  │
+│                                                          [default: random]                       │
+│ --gentle                                                 Roast the code instead of whoever wrote │
+│                                                          it, and leave git blame out of it.      │
+│ --help                                                   Show this message and exit.             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ With --backend llm, these environment variables say which model to use. Any
+ OpenAI-compatible endpoint works, local (Ollama, LM Studio) or hosted.
+
+   SLOP_TEST_BASE_URL     API root, e.g. http://localhost:11434/v1 for Ollama
+   SLOP_TEST_MODEL        model name, e.g. gemma3:12b
+   SLOP_TEST_API_KEY      sent as a bearer token; not needed for local servers
+   SLOP_TEST_TEMPERATURE  sampling temperature, default 1.0
+```
+
+Under pytest, `pytest --help` lists slop-test's options in their own group:
+
+```
+assertion-free testing:
+  --vibes               Replace each test's real outcome with how it feels. No test body, fixture or
+                        setup runs.
+  --vibes-backend={mock,llm,openai}
+                        Who judges under --vibes. mock: an offline coin flip with stock reasons.
+                        llm: a model, set up with the SLOP_TEST_* variables (see slop-test run
+                        --help). openai is an old name for llm. Default: mock.
+  --vibes-retries=N     How many more tries a failed test gets, each after a pep talk. A pass on a
+                        retry is PASSED EMOTIONALLY. Default: 3.
+  --vibes-strict        After each verdict, ask "Are you sure?" once. The answer is final.
+  --vibes-seed=N        Makes the mock backend's verdicts reproducible. Default: random, printed at
+                        the end of the run.
+  --vibes-read-the-code
+                        Send each test's code to the model, not just its name and docstring. llm
+                        only.
+  --vibes-persona={random,therapist,founder,commentator,parent,bard,hr,detective,sommelier}
+                        Whose voice the model judges in under --vibes. llm only. Default: a new one
+                        each run.
+  --vibes-jury=N        How many judges each test gets under --vibes, each a different persona. The
+                        majority wins and the losing side dissents. Default: 1.
+  --roast               Run tests for real, then judge them like a pessimist: real failures fail, so
+                        do passing tests that check nothing, and every test gets roasted.
+  --roast-backend={mock,llm,openai}
+                        Who writes the roasts under --roast: built-in lines (mock) or a model (llm).
+                        Pass/fail doesn't depend on it. Default: mock.
+  --roast-persona={random,therapist,founder,commentator,parent,bard,hr,detective,sommelier}
+                        Whose voice the model roasts in under --roast. llm only. Default: a new one
+                        each run.
+  --roast-gentle        Roast the code instead of whoever wrote it, and leave git blame out of it.
+```
+
+---
+
+## Troubleshooting
+
+| What you see | Why | What to do |
+|---|---|---|
+| `command not found: slop-test` | It isn't installed where your shell looks, or the alias was set in another tab. | Use pipx, or put the alias in `~/.zshrc`. Or call it by full path, like `/path/to/slop-test/.venv/bin/slop-test`. |
+| `command not found: pytest` | The project's virtualenv isn't active in this tab. | `source .venv/bin/activate` |
+| Every verdict is `model unavailable, assumed fine`, instantly | `slop-test` can't reach a model: the server isn't running, the model isn't downloaded or is misspelled, or the `SLOP_TEST_*` variables aren't set in this tab. | `env \| grep SLOP_TEST` to check the settings, `ollama list` to check the model, `curl $SLOP_TEST_BASE_URL/models` to check the server. |
+| Some verdicts are `model unavailable` | The model replied with broken JSON twice in a row. Small models do. | Try `gemma3:12b`, or live with it: it counts as a pass. |
+| Every verdict is `model unavailable` with a hosted API | Usually a missing or wrong key, or a model that rejects custom temperatures. | Check `SLOP_TEST_API_KEY` is set (without printing it: `[ -n "$SLOP_TEST_API_KEY" ] && echo set`), and try `export SLOP_TEST_TEMPERATURE=1`. |
+| A run takes minutes | Each juror is a call per test, and so is every pep talk. | Point it at one file, drop `--jury`, or use a smaller model. |
+| `No tests found in tests` | There's a `tests/` folder, but your tests are somewhere else. | Pass a path: `slop-test run .` or `slop-test run src/`. |
+| Roasts never mention when you committed | The repo isn't in git, or nothing was committed at a time worth mocking. | Commit something at 2am. |
 
 ---
 
