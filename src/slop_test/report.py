@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import zlib
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
@@ -31,11 +32,29 @@ SUPPORTIVE_LINES = (
     "{name}, every test fails sometimes. It doesn't define you.",
     "Deep breaths, {name}.",
     "We believe in you, {name}.",
+    "{name}, failing is just passing that hasn't happened yet.",
+    "Nobody's watching, {name}. Except CI.",
+    "{name}, you're more than your exit code.",
+    "Shake it off, {name}.",
+    "{name}, remember why you were written.",
+    "It's not you, {name}. It's the environment.",
+    "One more time, {name}, with feeling.",
+    "{name}, the build believes in you. Mostly.",
+    "Hydrate, {name}. Then pass.",
+    "{name}, you miss 100% of the assertions you don't make.",
+    "Small steps, {name}. Green ones.",
+    "{name}, this is a safe space.",
+    "Visualize the green checkmark, {name}.",
+    "{name}, your stack trace is valid.",
+    "Chin up, {name}. Flakiness is temporary.",
 )
 
 
 def supportive_line(test: DiscoveredTest, attempt: int) -> str:
-    return SUPPORTIVE_LINES[(attempt - 1) % len(SUPPORTIVE_LINES)].format(name=test.name)
+    """Pep talks come in a fixed order, but each test starts somewhere different in it, so
+    retries never repeat themselves and no two tests hear the same thing first."""
+    start = zlib.crc32(test.qualname.encode())
+    return SUPPORTIVE_LINES[(start + attempt - 1) % len(SUPPORTIVE_LINES)].format(name=test.name)
 
 
 def bench_line(personas: Sequence[Persona]) -> str:

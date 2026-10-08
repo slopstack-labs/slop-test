@@ -84,42 +84,63 @@ ROASTS = {
         "No assertions. It would still pass if you deleted the code it tests.",
         "This test asserts nothing. It's not a test, it's a wish.",
         "Zero assertions. It passes the way a parked car never crashes.",
+        "It runs some code and hopes for the best. That's not testing, that's prayer.",
+        "No assertions. It's a smoke test without the smoke detector.",
+        "Checks nothing, fails never. The perfect employee.",
     ),
     "trivial": (
         "Its only assertion can't fail. `assert True` is a hope, not a test.",
         "It checks that true is true. Bold, but not useful.",
+        "An assertion that can't fail is a participation trophy.",
+        "It asserts something that was never in doubt. Riveting.",
     ),
     "sleep": (
         "Sleeps in a test. That's a race condition taking a nap.",
         "Calls sleep(). Your CI bill sends its regards.",
+        "sleep() in a test: hoping the bug gets bored and leaves.",
+        "It sleeps. On the job. In a test.",
     ),
     "long": (
         "{lines} lines long. This test has a plot.",
         "{lines} lines. Somewhere in there is a test, probably.",
+        "{lines} lines. This test needs a table of contents.",
+        "{lines} lines. By the end, nobody remembers how it started.",
     ),
     "todo": (
         "Has a TODO in it. So does everything else you've written.",
         "Contains a TODO, which is code for 'never'.",
+        "A TODO in a test: the code equivalent of 'let's grab coffee sometime'.",
+        "There's a TODO. It's been there longer than some of the team.",
     ),
     "print": (
         "Left a debug print in. Nobody is reading that.",
         "Prints to the console mid-test, like a cry for help.",
+        "A print() in a test is a note in a bottle. Nobody's coming.",
+        "It prints while it tests. Narrating its own decline.",
     ),
     "mocks": (
         "Mostly mocks. You're testing that your mocks work. They do.",
         "So many mocks it's basically a puppet show.",
+        "Everything is mocked. It's an integration test of nothing.",
+        "More mocks than code. It's mocks all the way down.",
     ),
     "swallow": (
         "Catches an exception and does nothing with it. Very zen. Very wrong.",
         "Swallows exceptions, so failures go to die quietly.",
+        "An except with a pass in it: the error was there, and then it wasn't.",
+        "It catches every error and tells nobody. A vault of shame.",
     ),
     "vague_name": (
         "Named '{name}'. Very descriptive. Of nothing.",
         "'{name}' tells me nothing, and I suspect that's on purpose.",
+        "'{name}'. Future readers will have to guess. They'll guess wrong.",
+        "Called '{name}', which narrows it down to everything.",
     ),
     "slow": (
         "Took {seconds:.1f}s. That's not a unit test, that's a commute.",
         "Took {seconds:.1f}s to tell you what you already feared.",
+        "{seconds:.1f}s. Somewhere, a developer is staring at a progress bar.",
+        "{seconds:.1f}s. The suite gets a little slower every time this runs.",
     ),
 }
 
@@ -129,42 +150,63 @@ DEV_ROASTS = {
         "you wrote a test that checks nothing, then went to lunch.",
         "you wrote this to make the test count go up, not to find bugs. It worked.",
         "zero assertions. You don't test code, you just visit it.",
+        "you call this a test. The code under test calls it a day off.",
+        "no assertions. You've met your coverage target, and nothing else.",
+        "this runs the code and walks away. You'd make a great getaway driver.",
     ),
     "trivial": (
         "`assert True`. You needed a win today, and you gave yourself one.",
         "you made the test pass by testing nothing. Management would be proud.",
+        "you asserted something that can't fail. Bold of you to call that confidence.",
+        "you wrote an assertion that agrees with itself. Like your code reviews.",
     ),
     "sleep": (
         "you put sleep() in a test. You don't fix race conditions, you wait them out.",
         "a sleep() in a test. You'd rather wait than understand.",
+        "you added a sleep() and called it synchronization. Bold.",
+        "you're not sure when it's ready, so you nap. Relatable, but no.",
     ),
     "long": (
         "{lines} lines. You don't write tests, you write sagas.",
         "{lines} lines. Somebody has trouble letting go.",
+        "{lines} lines. You were paid by the line, weren't you.",
+        "{lines} lines, and you never thought to split it. Commitment issues, but backwards.",
     ),
     "todo": (
         "you left a TODO. We both know you're never coming back for it.",
         "a TODO, from you. That's not a plan, that's a confession.",
+        "you wrote TODO instead of doing it. Efficient, in a way.",
+        "your TODO has seen more standups than you have.",
     ),
     "print": (
         "you debug with print() and leave the evidence at the scene.",
         "a print() left in. Still debugging like it's your first week, then.",
+        "you print instead of asserting. You want to see the problem, not stop it.",
+        "a stray print(). You were here, and you want everyone to know.",
     ),
     "mocks": (
         "you mocked everything so nothing could hurt you. Your therapist would like a word.",
         "this much mocking is a trust issue, not a test strategy.",
+        "you replaced every dependency with a puppet and called it a test.",
+        "you mock your collaborators. In code, too.",
     ),
     "swallow": (
         "you catch exceptions and do nothing with them. Very healthy. Very you.",
         "you swallow errors whole. Bold coping mechanism.",
+        "you caught the error and looked away. Classic avoidance.",
+        "an empty except. You'd rather not know, and now you won't.",
     ),
     "vague_name": (
         "you named it '{name}'. Naming things is hard, and you didn't even try.",
         "'{name}'. You had one chance to say what this tests, and you passed.",
+        "'{name}'. You named it the way people name Wi-Fi networks.",
+        "you called it '{name}'. Even you won't remember why by Monday.",
     ),
     "slow": (
         "{seconds:.1f}s. You run this and go make coffee, don't you.",
         "{seconds:.1f}s. Your test suite is the reason you have a second monitor.",
+        "{seconds:.1f}s. You've never once run the whole suite locally, have you.",
+        "{seconds:.1f}s. You wrote a test and a reason to check your phone.",
     ),
 }
 # Jabs about when the test was last committed, from git blame.
@@ -172,18 +214,26 @@ WHEN_ROASTS = {
     "uncommitted": (
         "not even committed yet. Keeping your options open, I see.",
         "uncommitted. Can't be blamed if git doesn't know, right?",
+        "still uncommitted. Plausible deniability is a strategy, I suppose.",
+        "not committed. Even git isn't sure about this one.",
     ),
     "friday": (
         "committed on a Friday at {time}. The weekend called, and you answered.",
         "Friday, {time}. You weren't writing a test, you were leaving.",
+        "Friday at {time}. Monday-you is going to have questions.",
+        "a Friday {time} commit. Brave, or just tired?",
     ),
     "weekend": (
         "committed on a {day}. It's the weekend. Touch grass.",
         "a {day} commit. Nobody asked you to do this, and it shows.",
+        "{day}. You chose this over sunlight.",
+        "a {day} commit. Your weekend called; it wants to talk.",
     ),
     "late": (
         "committed at {time}. Go to bed.",
         "{time}. Nothing good has ever been committed at {time}.",
+        "{time}. Your future self is already disappointed.",
+        "a {time} commit. The bugs were awake too, apparently.",
     ),
 }
 
@@ -192,20 +242,32 @@ HEADLINES = {
         "failed. Called it.",
         "failed, as foretold",
         "failed. Shocking to no one.",
+        "failed. I'd act surprised, but.",
+        "failed. The prophecy is fulfilled.",
+        "failed, and honestly, fair enough",
     ),
     "passed": (
         "passed, somehow",
         "passed. I'm as surprised as you are.",
         "passed. For now.",
         "passed. Suspicious.",
+        "passed. Let's not make a big deal of it.",
+        "passed. I'll be checking again.",
+        "passed, against my advice",
+        "passed. Don't get used to it.",
     ),
     "skipped": (
         "skipped. Can't fail if you don't try.",
         "skipped. Cowardly, but honest.",
+        "skipped. Strategic avoidance.",
+        "skipped. We'll circle back. We won't.",
     ),
     "not run": (
         "not run. Assume the worst.",
         "not run, so probably broken",
+        "not run. Schrödinger's test.",
+        "not run, and I have my doubts",
+        "not run. Innocent until proven guilty, but I've seen the code.",
     ),
     "passed but no_assertions": ("passed, but it checks nothing",),
     "passed but trivial": ("passed, but only proves that true is true",),
@@ -214,10 +276,31 @@ HEADLINES = {
 }
 
 CLOSERS = {
-    "all failed": "Everything failed. At least it's consistent.",
-    "some failed": "About what I expected.",
-    "all passed": "Everything passed. I don't trust it.",
-    "none ran": "Nothing failed, but only because nothing ran.",
+    "all failed": (
+        "Everything failed. At least it's consistent.",
+        "Everything failed. A clean sweep, just the wrong kind.",
+        "Not one survivor. Impressive, in its way.",
+        "All failed. The suite is, in a sense, finished.",
+    ),
+    "some failed": (
+        "About what I expected.",
+        "Disappointing, but not surprising.",
+        "Some failed. The rest are thinking about it.",
+        "Roughly as broken as it looked.",
+        "I've seen worse. Not recently, though.",
+    ),
+    "all passed": (
+        "Everything passed. I don't trust it.",
+        "All green. Something's wrong.",
+        "Everything passed. Check the tests are actually running.",
+        "No failures. Enjoy it while it lasts.",
+    ),
+    "none ran": (
+        "Nothing failed, but only because nothing ran.",
+        "Zero failures, zero evidence.",
+        "Nothing failed. Nothing ran, either.",
+        "A flawless record of not finding out.",
+    ),
 }
 
 WEAK = ("no_assertions", "trivial")
@@ -308,12 +391,16 @@ def summary_line(roasts: Sequence[Roast], closer: str | None = None) -> str:
 
 def _built_in_closer(counts: dict[RoastStatus, int], total: int) -> str:
     if counts["failed"] == total:
-        return CLOSERS["all failed"]
-    if counts["failed"]:
-        return CLOSERS["some failed"]
-    if counts["passed"] == total:
-        return CLOSERS["all passed"]
-    return CLOSERS["none ran"]
+        mood = "all failed"
+    elif counts["failed"]:
+        mood = "some failed"
+    elif counts["passed"] == total:
+        mood = "all passed"
+    else:
+        mood = "none ran"
+    # Same results, same remark: there's no test to seed this from, so use the counts.
+    options = CLOSERS[mood]
+    return options[zlib.crc32(repr(sorted(counts.items())).encode()) % len(options)]
 
 
 def _built_in_roasts(

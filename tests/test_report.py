@@ -40,9 +40,16 @@ def test_summary_line_counts_emotional_passes_as_passes():
     assert summary_line(verdicts) == "2 passed, 1 failed, 85% vibe coverage"
 
 
-def test_supportive_lines_name_the_test_and_cycle():
+def test_supportive_lines_name_the_test_and_never_repeat_until_they_run_out():
     test = make_test("test_data_migration")
+    lines = [supportive_line(test, attempt) for attempt in range(1, len(SUPPORTIVE_LINES) + 1)]
 
-    assert supportive_line(test, 1) == "You've got this, test_data_migration."
-    assert supportive_line(test, 2) != supportive_line(test, 1)
-    assert supportive_line(test, len(SUPPORTIVE_LINES) + 1) == supportive_line(test, 1)
+    assert all("test_data_migration" in line for line in lines)
+    assert len(set(lines)) == len(SUPPORTIVE_LINES)
+    assert supportive_line(test, len(SUPPORTIVE_LINES) + 1) == lines[0]
+
+
+def test_different_tests_hear_different_things_first():
+    firsts = {supportive_line(make_test(f"test_{i}"), 1).split(",")[0][:12] for i in range(40)}
+
+    assert len(firsts) > 5
