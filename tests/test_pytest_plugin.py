@@ -3,12 +3,12 @@ from importlib.metadata import entry_points
 from pathlib import Path
 
 import pytest
-from fakes import ScriptedBackend
+from fakes import ScriptedBackend, patch_bench
 
 from slop_test.backends.mock import MockBackend
 from slop_test.discovery import discover
 from slop_test.judge import judge
-from slop_test.roast import ROASTS
+from slop_test.roast import DEV_ROASTS, ROASTS
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 WORDS = {"passed": "PASSED", "passed_emotionally": "PASSED EMOTIONALLY", "failed": "FAILED"}
@@ -49,11 +49,7 @@ def scripted(monkeypatch):
     def install(script=None, **kwargs):
         backend = ScriptedBackend(script, **kwargs)
 
-        def get_backend(name, **options):
-            backend.requested = (name, options)
-            return backend
-
-        monkeypatch.setattr("slop_test.pytest_plugin.get_backend", get_backend)
+        patch_bench(monkeypatch, "slop_test.pytest_plugin.get_bench", backend)
         return backend
 
     return install
@@ -150,9 +146,13 @@ def test_vibes_options_reach_the_backend(pytester, scripted):
         "--vibes-seed=5",
         "--vibes-backend=llm",
         "--vibes-read-the-code",
+        "--vibes-persona=bard",
+        "--vibes-jury=3",
     )
 
-    assert backend.requested == ("llm", {"seed": 5, "read_the_code": True})
+    name, options = backend.requested
+    assert name == "llm"
+    assert options == {"seed": 5, "read_the_code": True, "persona": "bard", "jury": 3}
     assert backend.judge_calls["test_really_fails"] == 2
     assert set(backend.sure_calls.values()) == {1}
     assert len(backend.sure_calls) == 4
@@ -248,9 +248,9 @@ def test_roast_runs_tests_for_real_and_fails_the_weak_ones(pytester):
         [
             "*assert (1 + 1) == 3*",
             "*_ test_checks_nothing _*",
-            "It passed, but it checks nothing.",
+            "Passed, but it checks nothing.",
             "*_ test_vat_is_correct _*",
-            "It passed, but only proves that true is true.",
+            "Passed, but only proves that true is true.",
             "*= roast =*",
             "✗ *::test_really_fails: failed*",
             "✗ *::test_checks_nothing: passed, but it checks nothing",
@@ -280,7 +280,7 @@ def test_roast_mentions_slow_tests(pytester, monkeypatch):
 
     result = pytester.runpytest("--roast")
 
-    assert "Took 0.0s" in result.stdout.str()
+    assert "0.0s." in result.stdout.str()
 
 
 @pytest.mark.parametrize("name", ["llm", "openai"])
@@ -292,7 +292,7 @@ def test_roast_with_an_unconfigured_model_uses_built_in_roasts(pytester, monkeyp
     result = pytester.runpytest("--roast", f"--roast-backend={name}")
 
     result.assert_outcomes(failed=1)
-    assert any(line in result.stdout.str() for line in ROASTS["no_assertions"])
+    assert any(capitalized(line) in result.stdout.str() for line in DEV_ROASTS["no_assertions"])
 
 
 def test_vibes_and_roast_cannot_both_be_on(pytester):
@@ -311,3 +311,16 @@ def test_without_roast_weak_tests_pass_as_usual(pytester):
 
     result.assert_outcomes(passed=1)
     assert "= roast =" not in result.stdout.str()
+
+
+def capitalized(line):
+    return line[:1].upper() + line[1:]
+
+
+def test_roast_gentle_sticks_to_the_code(pytester):
+    pytester.makepyfile("def test_checks_nothing():\n    sum([1, 2])\n")
+
+    result = pytester.runpytest("--roast", "--roast-gentle")
+
+    result.assert_outcomes(failed=1)
+    assert any(line in result.stdout.str() for line in ROASTS["no_assertions"])

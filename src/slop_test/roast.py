@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+from slop_test.blame import Blame, blame
 from slop_test.discovery import DiscoveredTest
 
 if TYPE_CHECKING:
@@ -122,6 +123,70 @@ ROASTS = {
     ),
 }
 
+# The default: aimed at whoever wrote the test, as "you". Never by name.
+DEV_ROASTS = {
+    "no_assertions": (
+        "you wrote a test that checks nothing, then went to lunch.",
+        "you wrote this to make the test count go up, not to find bugs. It worked.",
+        "zero assertions. You don't test code, you just visit it.",
+    ),
+    "trivial": (
+        "`assert True`. You needed a win today, and you gave yourself one.",
+        "you made the test pass by testing nothing. Management would be proud.",
+    ),
+    "sleep": (
+        "you put sleep() in a test. You don't fix race conditions, you wait them out.",
+        "a sleep() in a test. You'd rather wait than understand.",
+    ),
+    "long": (
+        "{lines} lines. You don't write tests, you write sagas.",
+        "{lines} lines. Somebody has trouble letting go.",
+    ),
+    "todo": (
+        "you left a TODO. We both know you're never coming back for it.",
+        "a TODO, from you. That's not a plan, that's a confession.",
+    ),
+    "print": (
+        "you debug with print() and leave the evidence at the scene.",
+        "a print() left in. Still debugging like it's your first week, then.",
+    ),
+    "mocks": (
+        "you mocked everything so nothing could hurt you. Your therapist would like a word.",
+        "this much mocking is a trust issue, not a test strategy.",
+    ),
+    "swallow": (
+        "you catch exceptions and do nothing with them. Very healthy. Very you.",
+        "you swallow errors whole. Bold coping mechanism.",
+    ),
+    "vague_name": (
+        "you named it '{name}'. Naming things is hard, and you didn't even try.",
+        "'{name}'. You had one chance to say what this tests, and you passed.",
+    ),
+    "slow": (
+        "{seconds:.1f}s. You run this and go make coffee, don't you.",
+        "{seconds:.1f}s. Your test suite is the reason you have a second monitor.",
+    ),
+}
+# Jabs about when the test was last committed, from git blame.
+WHEN_ROASTS = {
+    "uncommitted": (
+        "not even committed yet. Keeping your options open, I see.",
+        "uncommitted. Can't be blamed if git doesn't know, right?",
+    ),
+    "friday": (
+        "committed on a Friday at {time}. The weekend called, and you answered.",
+        "Friday, {time}. You weren't writing a test, you were leaving.",
+    ),
+    "weekend": (
+        "committed on a {day}. It's the weekend. Touch grass.",
+        "a {day} commit. Nobody asked you to do this, and it shows.",
+    ),
+    "late": (
+        "committed at {time}. Go to bed.",
+        "{time}. Nothing good has ever been committed at {time}.",
+    ),
+}
+
 HEADLINES = {
     "failed": (
         "failed. Called it.",
@@ -200,8 +265,13 @@ def roast(
     *,
     duration: float | None = None,
     model: OpenAICompatBackend | None = None,
+    gentle: bool = False,
 ) -> Roast:
-    """A pessimist's verdict. `outcome` is what really happened, or None if it never ran."""
+    """A pessimist's verdict. `outcome` is what really happened, or None if it never ran.
+
+    The roasts go after whoever wrote the test, as "you", and use git to see when they last
+    touched it. With `gentle`, they stick to the code.
+    """
     kinds = critique(test, duration=duration)
     weakness = next((kind for kind in kinds if kind in WEAK), None)
     ran = "not run" if outcome is None else outcome
@@ -212,31 +282,67 @@ def roast(
         status = ran
         headline = _pick(test, status, HEADLINES[status])
 
-    roasts = model.roast(test, status=status, findings=kinds) if model else None
+    who = None if gentle else blame(test)
+    written = (
+        model.roast(test, verdict=headline, findings=kinds, who=who, gentle=gentle)
+        if model
+        else None
+    )
+    if written and written.headline:
+        headline = written.headline
+    roasts = written.roasts if written and written.roasts else ()
     if not roasts:
-        roasts = [_roast_line(test, kind, duration) for kind in kinds]
-    return Roast(status, headline, tuple(roasts))
+        roasts = _built_in_roasts(test, kinds, duration, who, gentle)
+    return Roast(status, headline, roasts)
 
 
-def summary_line(roasts: Sequence[Roast]) -> str:
+def summary_line(roasts: Sequence[Roast], closer: str | None = None) -> str:
+    """The counts, then `closer`, or a built-in remark that fits the counts."""
     counts = {status: sum(r.status == status for r in roasts) for status in ROAST_STATUSES}
     parts = [f"{counts['passed']} passed", f"{counts['failed']} failed"]
     parts += [f"{counts[s]} {s}" for s in ("skipped", "not run") if counts[s]]
-    if counts["failed"] == len(roasts):
-        closer = CLOSERS["all failed"]
-    elif counts["failed"]:
-        closer = CLOSERS["some failed"]
-    elif counts["passed"] == len(roasts):
-        closer = CLOSERS["all passed"]
-    else:
-        closer = CLOSERS["none ran"]
-    return f"{', '.join(parts)}. {closer}"
+    return f"{', '.join(parts)}. {closer or _built_in_closer(counts, len(roasts))}"
 
 
-def _roast_line(test: DiscoveredTest, kind: str, duration: float | None) -> str:
-    template = _pick(test, kind, ROASTS[kind])
-    lines = len(test.source.splitlines())
-    return template.format(name=test.name, lines=lines, seconds=duration or 0.0)
+def _built_in_closer(counts: dict[RoastStatus, int], total: int) -> str:
+    if counts["failed"] == total:
+        return CLOSERS["all failed"]
+    if counts["failed"]:
+        return CLOSERS["some failed"]
+    if counts["passed"] == total:
+        return CLOSERS["all passed"]
+    return CLOSERS["none ran"]
+
+
+def _built_in_roasts(
+    test: DiscoveredTest,
+    kinds: list[str],
+    duration: float | None,
+    who: Blame | None,
+    gentle: bool,
+) -> tuple[str, ...]:
+    details = {"name": test.name, "lines": len(test.source.splitlines()), "seconds": duration or 0}
+    if gentle:
+        return tuple(_pick(test, kind, ROASTS[kind]).format(**details) for kind in kinds)
+
+    lines = [_pick(test, kind, DEV_ROASTS[kind]).format(**details) for kind in kinds]
+    if who is not None and (when := _when_to_roast(who)):
+        time = {"time": f"{who.when:%H:%M}", "day": f"{who.when:%A}"} if who.when else {}
+        lines.append(_pick(test, when, WHEN_ROASTS[when]).format(**time))
+    return tuple(line[:1].upper() + line[1:] for line in lines)
+
+
+def _when_to_roast(who: Blame) -> str | None:
+    """Which jab, if any, the timing of the last commit deserves."""
+    if who.when is None:
+        return "uncommitted"
+    if who.when.weekday() == 4 and who.when.hour >= 15:
+        return "friday"
+    if who.when.weekday() >= 5:
+        return "weekend"
+    if who.when.hour >= 22 or who.when.hour < 5:
+        return "late"
+    return None
 
 
 def _pick(test: DiscoveredTest, topic: str, options: Sequence[str]) -> str:

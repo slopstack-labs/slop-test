@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 import httpx
 import pytest
@@ -8,13 +9,19 @@ from slop_test.backends import get_backend
 from slop_test.backends.openai_compat import (
     ARE_YOU_SURE,
     FALLBACK,
+    GENTLE_ROAST_TASK,
+    MAX_ASSERTION_LENGTH,
+    MAX_LINE_LENGTH,
     MAX_REASON_LENGTH,
     MAX_ROAST_LENGTH,
     MAX_ROASTS,
-    ROAST_PROMPT,
+    ROAST_TASK,
+    ModelRoast,
     OpenAICompatBackend,
 )
+from slop_test.blame import Blame
 from slop_test.judge import Verdict
+from slop_test.personas import PERSONAS
 
 API_KEY = "sk-test-do-not-print-me"
 TEST = make_test(
@@ -100,7 +107,54 @@ def test_accepts_passed_emotionally_and_tidies_the_reason():
     assert verdict.status == "passed_emotionally"
     assert verdict.confidence == 1.0
     assert verdict.reason.startswith("it passed eventually")
-    assert len(verdict.reason) == MAX_REASON_LENGTH
+    assert verdict.reason.endswith("…")
+    assert len(verdict.reason) <= MAX_REASON_LENGTH
+
+
+def test_parses_the_imagined_assertion():
+    content = json.dumps(
+        {
+            "status": "failed",
+            "confidence": 0.8,
+            "reason": "the floats betrayed us",
+            "assertion": "  assert 0.1 + 0.2 == 0.3  # does not hold\nprint('extra line')",
+        }
+    )
+
+    verdict = make_backend(replying(content)).judge(TEST)
+
+    assert verdict.assertion == "assert 0.1 + 0.2 == 0.3  # does not hold"
+
+
+@pytest.mark.parametrize("assertion", [None, "", 42, "x" * 500])
+def test_a_missing_or_odd_assertion_doesnt_spoil_the_verdict(assertion):
+    reply = {"status": "passed", "confidence": 0.9, "reason": "fine", "assertion": assertion}
+
+    verdict = make_backend(replying(json.dumps(reply))).judge(TEST)
+
+    assert verdict.status == "passed"
+    if isinstance(assertion, str) and assertion:
+        assert len(verdict.assertion) <= MAX_ASSERTION_LENGTH
+    else:
+        assert verdict.assertion is None
+
+
+def test_persona_and_temperature_reach_the_model():
+    requests = []
+    persona = PERSONAS["parent"]
+
+    make_backend(replying(GOOD, requests), persona=persona, temperature=1.3).judge(TEST)
+
+    body = json.loads(requests[0].content)
+    assert body["temperature"] == 1.3
+    assert body["messages"][0]["content"].startswith(persona.prompt)
+
+
+@pytest.mark.parametrize(("value", "expected"), [("0.4", 0.4), ("hot", 1.0), (None, 1.0)])
+def test_temperature_comes_from_the_environment(value, expected):
+    env = {"SLOP_TEST_TEMPERATURE": value} if value else {}
+
+    assert OpenAICompatBackend.from_env(env).temperature == expected
 
 
 @pytest.mark.parametrize("status_code", [400, 401, 429, 500, 503])
@@ -224,30 +278,47 @@ def test_api_key_never_shows_up(capsys):
     assert API_KEY not in "".join(capsys.readouterr())
 
 
-def test_roast_sends_the_code_and_returns_the_lines():
+def test_roast_sends_the_code_and_returns_headline_and_roasts():
     requests = []
-    reply = json.dumps({"roasts": ["  Asserts   nothing,\nconfidently.  ", "Also, hunter2?"]})
+    reply = {
+        "headline": " Doomed,  frankly ",
+        "roasts": ["  Asserts   nothing,\nfirmly.  ", "hunter2?"],
+    }
 
-    lines = make_backend(replying(reply, requests)).roast(
-        TEST, status="failed", findings=["no_assertions", "vague_name"]
+    written = make_backend(replying(json.dumps(reply), requests)).roast(
+        TEST, verdict="passed, but it checks nothing", findings=["no_assertions", "vague_name"]
     )
 
-    assert lines == ["Asserts nothing, confidently.", "Also, hunter2?"]
+    assert written == ModelRoast("Doomed, frankly", ("Asserts nothing, firmly.", "hunter2?"))
     messages = json.loads(requests[0].content)["messages"]
-    assert messages[0]["content"] == ROAST_PROMPT
+    assert messages[0]["content"] == ROAST_TASK
     prompt = messages[-1]["content"]
-    assert "Result: failed" in prompt
+    assert "Verdict: passed, but it checks nothing" in prompt
     assert "no assertions, vague name" in prompt
     assert "hunter2" in prompt  # the code goes along even without read_the_code
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected"),
+    [
+        ({"headline": "Just a headline"}, ModelRoast("Just a headline", ())),
+        ({"roasts": ["Just a roast."]}, ModelRoast(None, ("Just a roast.",))),
+    ],
+    ids=["headline-only", "roasts-only"],
+)
+def test_roast_takes_what_it_can_get(reply, expected):
+    written = make_backend(replying(json.dumps(reply))).roast(TEST, verdict="passed", findings=[])
+
+    assert written == expected
 
 
 def test_roast_caps_and_trims_what_the_model_says():
     reply = json.dumps({"roasts": ["x" * 500, "", 42, "b", "c", "d"]})
 
-    lines = make_backend(replying(reply)).roast(TEST, status="passed", findings=[])
+    written = make_backend(replying(reply)).roast(TEST, verdict="passed", findings=[])
 
-    assert lines == ["x" * (MAX_ROAST_LENGTH - 1) + "…", "b", "c"]
-    assert len(lines) == MAX_ROASTS
+    assert written.roasts == ("x" * (MAX_ROAST_LENGTH - 1) + "…", "b", "c")
+    assert len(written.roasts) == MAX_ROASTS
 
 
 @pytest.mark.parametrize(
@@ -262,7 +333,7 @@ def test_roast_caps_and_trims_what_the_model_says():
 def test_long_roasts_are_cut_at_a_sentence_or_word(roast, expected):
     reply = json.dumps({"roasts": [roast]})
 
-    [line] = make_backend(replying(reply)).roast(TEST, status="passed", findings=[])
+    [line] = make_backend(replying(reply)).roast(TEST, verdict="passed", findings=[]).roasts
 
     assert line == expected.strip()
     assert len(line) <= MAX_ROAST_LENGTH
@@ -274,9 +345,140 @@ def test_long_roasts_are_cut_at_a_sentence_or_word(roast, expected):
         lambda request: httpx.Response(500),
         replying("I'd rather not."),
         replying('{"roasts": "not a list"}'),
-        replying('{"roasts": ["", "   "]}'),
+        replying('{"headline": "", "roasts": ["", "   "]}'),
     ],
     ids=["http-error", "not-json", "not-a-list", "empty"],
 )
 def test_roast_returns_none_when_the_model_lets_us_down(handler):
-    assert make_backend(handler).roast(TEST, status="passed", findings=[]) is None
+    assert make_backend(handler).roast(TEST, verdict="passed", findings=[]) is None
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected"),
+    [
+        ("Chin up, little test.", "Chin up, little test."),
+        ('  "Quoted, for some reason."  \n\nAnd a second line.', "Quoted, for some reason."),
+        ("word " * 60, ("word " * 60)[: MAX_LINE_LENGTH - 1].rsplit(" ", 1)[0] + "…"),
+    ],
+    ids=["plain", "quoted-multiline", "long"],
+)
+def test_say_returns_one_tidy_line(reply, expected):
+    requests = []
+    bard = PERSONAS["bard"]
+
+    line = make_backend(replying(reply, requests), persona=bard).say("Cheer up a test.")
+
+    assert line == expected.strip()
+    messages = json.loads(requests[0].content)["messages"]
+    assert messages[0]["content"].startswith(bard.prompt)
+    assert messages[-1]["content"] == "Cheer up a test."
+
+
+@pytest.mark.parametrize(
+    "handler",
+    [lambda request: httpx.Response(500), replying("   \n  "), replying('""')],
+    ids=["http-error", "blank", "empty-quotes"],
+)
+def test_say_returns_none_when_the_model_has_nothing(handler):
+    assert make_backend(handler).say("Anything?") is None
+
+
+def replies(*contents, requests=None):
+    """A handler that gives each reply in turn."""
+    queue = list(contents)
+
+    def handler(request):
+        if requests is not None:
+            requests.append(request)
+        return reply(queue.pop(0))
+
+    return handler
+
+
+def test_a_garbled_reply_gets_a_second_chance():
+    requests = []
+
+    verdict = make_backend(replies("{oops", GOOD, requests=requests)).judge(TEST)
+
+    assert verdict == Verdict("failed", 0.7, "bad energy")
+    assert len(requests) == 2
+
+
+def test_two_garbled_replies_fall_back():
+    requests = []
+
+    assert make_backend(replies("{oops", "nope", requests=requests)).judge(TEST) == FALLBACK
+    assert len(requests) == 2
+
+
+def test_server_errors_are_not_retried():
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(500)
+
+    assert make_backend(handler).judge(TEST) == FALLBACK
+    assert len(requests) == 1
+
+
+def test_roasts_and_lines_get_a_second_chance_too():
+    backend = make_backend(replies("nope", '{"roasts": ["Second time lucky."]}', "  ", "Hi."))
+
+    assert backend.roast(TEST, verdict="passed", findings=[]).roasts == ("Second time lucky.",)
+    assert backend.say("Say hi.") == "Hi."
+
+
+def test_single_quoted_values_are_forgiven():
+    content = """```json
+{
+  "status": "passed_emotionally",
+  "confidence": 0.85,
+  "reason": "It's either dark or light!",
+  "assertion": 'assert "dark" in {"dark", "light"}  # Holds'
+}
+```"""
+
+    verdict = make_backend(replying(content)).judge(TEST)
+
+    assert verdict == Verdict(
+        "passed_emotionally",
+        0.85,
+        "It's either dark or light!",
+        'assert "dark" in {"dark", "light"}  # Holds',
+    )
+
+
+def test_roasting_the_developer_tells_the_model_who_did_it():
+    requests = []
+    culprit = Blame(datetime(2026, 10, 9, 17, 42, tzinfo=timezone.utc))
+
+    make_backend(replying('{"headline": "Busted"}', requests)).roast(
+        TEST, verdict="passed", findings=[], who=culprit
+    )
+    make_backend(replying('{"headline": "Busted"}', requests)).roast(
+        TEST, verdict="passed", findings=[], who=culprit, gentle=True
+    )
+
+    rude, gentle = (json.loads(r.content)["messages"] for r in requests)
+    assert rude[0]["content"] == ROAST_TASK
+    assert "Last committed: on a Friday at 17:42" in rude[-1]["content"]
+    assert "never use a name" in rude[0]["content"]
+    assert gentle[0]["content"] == GENTLE_ROAST_TASK
+    assert "Last committed" not in gentle[-1]["content"]
+
+
+@pytest.mark.parametrize(
+    ("who", "described"),
+    [(None, "unknown"), (Blame(None), "never: it isn't even committed")],
+)
+def test_roasting_without_a_known_culprit(who, described):
+    requests = []
+
+    make_backend(replying('{"headline": "Busted"}', requests)).roast(
+        TEST, verdict="passed", findings=[], who=who
+    )
+
+    assert (
+        f"Last committed: {described}" in json.loads(requests[0].content)["messages"][-1]["content"]
+    )

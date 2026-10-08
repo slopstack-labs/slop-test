@@ -3,8 +3,10 @@
 from collections import Counter
 from pathlib import Path
 
+from slop_test.backends import Bench
 from slop_test.discovery import DiscoveredTest
 from slop_test.judge import Status, Verdict
+from slop_test.personas import PERSONAS
 
 
 class ScriptedBackend:
@@ -52,3 +54,13 @@ def make_test(
         class_path=class_path,
         language=language,
     )
+
+
+def patch_bench(monkeypatch, target, backend):
+    """Make `target` (a module's get_bench) hand out `backend`, remembering what was asked."""
+
+    def get_bench(name, **options):
+        backend.requested = (name, options)
+        return Bench(backend, (PERSONAS["therapist"],), None)
+
+    monkeypatch.setattr(target, get_bench)

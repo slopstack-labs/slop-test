@@ -11,6 +11,7 @@ from rich.text import Text
 from slop_test import roast
 from slop_test.discovery import DiscoveredTest
 from slop_test.judge import Status, Verdict
+from slop_test.personas import Persona
 
 MARKS: dict[Status, tuple[str, str]] = {
     "passed": ("✓", "green"),
@@ -35,6 +36,15 @@ SUPPORTIVE_LINES = (
 
 def supportive_line(test: DiscoveredTest, attempt: int) -> str:
     return SUPPORTIVE_LINES[(attempt - 1) % len(SUPPORTIVE_LINES)].format(name=test.name)
+
+
+def bench_line(personas: Sequence[Persona]) -> str:
+    """Who's judging, for runs where it matters."""
+    titles = [p.title for p in personas]
+    if len(titles) == 1:
+        return f"Presiding: {titles[0]}."
+    titles[0] += " (foreperson)"
+    return f"The jury: {', '.join(titles[:-1])} and {titles[-1]}."
 
 
 def seed_hint(option: str, seed: int) -> str:
@@ -78,11 +88,19 @@ class Reporter:
     def unparsable(self, file: Path) -> None:
         self.console.print(Text(f"! skipped {file}: could not parse it, felt nothing", "yellow"))
 
-    def retrying(self, test: DiscoveredTest, attempt: int) -> None:
-        self.console.print(Text(f"  {supportive_line(test, attempt)}", "dim italic"))
+    def bench(self, personas: Sequence[Persona]) -> None:
+        self.console.print(Text(bench_line(personas), "dim"))
+        self.console.print()
+
+    def retrying(self, pep_talk: str) -> None:
+        self.console.print(Text(f"  {pep_talk}", "dim italic"))
 
     def result(self, test: DiscoveredTest, verdict: Verdict) -> None:
         self._line(test, MARKS[verdict.status], verdict.reason)
+        if verdict.assertion:
+            self.console.print(Text(f"    {verdict.assertion}", "dim"))
+        if verdict.dissent:
+            self.console.print(Text(f"    Dissent from {verdict.dissent}", "italic"))
 
     def roasted(self, test: DiscoveredTest, result: roast.Roast) -> None:
         self._line(test, ROAST_MARKS[result.status], result.headline)
@@ -103,10 +121,13 @@ class Reporter:
         self.console.print()
         self.console.print(Text(summary_line(verdicts), f"bold {color}"))
 
-    def roast_summary(self, results: Sequence[roast.Roast]) -> None:
+    def roast_summary(self, results: Sequence[roast.Roast], closer: str | None = None) -> None:
         color = "red" if any(r.status == "failed" for r in results) else "green"
         self.console.print()
-        self.console.print(Text(roast.summary_line(results), f"bold {color}"))
+        self.console.print(Text(roast.summary_line(results, closer), f"bold {color}"))
+
+    def closer(self, remark: str) -> None:
+        self.console.print(Text(remark, "italic"))
 
     def seed(self, seed: int) -> None:
         self.console.print(Text(seed_hint("--seed", seed), "dim"))

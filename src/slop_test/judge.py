@@ -23,6 +23,8 @@ class Verdict:
     status: Status
     confidence: float  # 0.0–1.0
     reason: str  # short, e.g. "felt right", "probably fine"
+    assertion: str | None = None  # the assertion a model imagines the test makes
+    dissent: str | None = None  # what the losing side of a jury had to say
 
     @property
     def failed(self) -> bool:
@@ -36,12 +38,14 @@ def judge(
     retries: int = 3,
     strict: bool = False,
     on_retry: RetryHook | None = None,
+    narrated: bool = False,
 ) -> Verdict:
     """Ask `backend` how `test` feels.
 
     A failed verdict is retried up to `retries` times, calling `on_retry(test, attempt)`
-    before each one. A test that comes around on a retry passed emotionally. With `strict`,
-    the backend is asked "Are you sure?" exactly once, and its answer is final.
+    before each one. A test that comes around on a retry passed emotionally; its reason
+    says so, unless the backend is `narrated` and has something better to say. With
+    `strict`, the backend is asked "Are you sure?" exactly once, and its answer is final.
     """
     verdict = backend.judge(test)
     attempt = 0
@@ -51,7 +55,8 @@ def judge(
             on_retry(test, attempt)
         verdict = backend.judge(test)
         if not verdict.failed:
-            verdict = replace(verdict, status="passed_emotionally", reason=EMOTIONAL_REASON)
+            reason = verdict.reason if narrated else EMOTIONAL_REASON
+            verdict = replace(verdict, status="passed_emotionally", reason=reason)
     if strict:
         verdict = backend.are_you_sure(test, verdict)
     return verdict
