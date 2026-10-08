@@ -7,7 +7,9 @@ a single point in time, and then fails at the worst possible moment, usually in 
 people. `slop-test` removes them from the loop. A model reads the name of each test,
 considers its docstring, and decides whether it feels like it passed.
 
-Your test code is never imported or executed. It doesn't need to be.
+Your test code is never imported or executed. It doesn't need to be. This works in
+[22 languages](#supported-languages): `slop-test` runs none of them, so it supports all of
+them equally.
 
 ```bash
 pip install git+https://github.com/slopstack-labs/slop-test
@@ -29,9 +31,9 @@ $ slop-test run examples/ --seed 0
 9 passed, 0 failed, 80% vibe coverage
 ```
 
-Every sample in this README is real output from [`examples/`](examples/test_example.py)
-with the default mock backend, seeded so you can reproduce it. Five of those nine tests
-fail under pytest.
+Every sample in this README is real output from the default mock backend, seeded so you
+can reproduce it, and comes from [`examples/`](examples/test_example.py) unless it says
+otherwise. Five of those nine tests fail under pytest.
 
 ---
 
@@ -142,9 +144,11 @@ slop-test run [PATH]
 slop-test --version
 ```
 
-`PATH` defaults to `tests/`. `slop-test` collects `test_*.py` and `*_test.py` files, and
-in them every function named `test_*`, including methods on `Test*` classes. It reads
-them with `ast`. Nothing is imported. Nothing runs.
+`PATH` defaults to `tests/` if it exists, and to the current directory if it doesn't.
+`slop-test` reads every test it finds there, in any of the
+[supported languages](#supported-languages): Python with `ast`, everything else with
+[tree-sitter](https://tree-sitter.github.io/). Nothing is imported. Nothing runs. When a
+run covers more than one file, each file's results come under a heading with its path.
 
 | Option | Default | Description |
 |---|---|---|
@@ -161,7 +165,7 @@ that insist on hearing bad news, `--honest-exit-codes` exits 1 if any test faile
 ### pytest
 
 The plugin registers itself when `slop-test` is installed. Without `--vibes` it does
-nothing.
+nothing. Like pytest, it only knows about Python.
 
 ```
 $ pytest examples/ -q
@@ -197,6 +201,51 @@ feelings.
 | `--vibes-strict` | off | Ask the backend "Are you sure?" once per test. |
 | `--vibes-seed=N` | random | Seed for the mock backend's feelings. |
 | `--vibes-read-the-code` | off | Also send each test's body to the backend. |
+
+### Supported languages
+
+`slop-test run` reads tests in 22 languages, identifies them the way each ecosystem's
+test runner would, and names them after the groups they sit in:
+
+```
+$ slop-test run tests/fixtures/polyglot/js --seed 0
+✓ Cart::adds an item                     (vibes immaculate)
+✓ Cart::applies legacy discounts         (no notes)
+✓ Cart::with %i items::totals correctly  (worked on my machine)
+✓ works without a describe               (vibes immaculate)
+✓ handles %i                             (looked confident)
+✓ supports template names                (seemed fine from here)
+
+6 passed, 0 failed, 82% vibe coverage
+```
+
+| Language | Test files | What counts as a test |
+|---|---|---|
+| Python | `test_*.py`, `*_test.py` | `test_*` functions, and methods on `Test*` classes |
+| JavaScript, TypeScript | `*.test.*`, `*.spec.*`, anything in a test directory | `test`, `it`, `specify` (and `.only`, `.skip`, `.each`…) inside `describe`, `suite` or `context`: Jest, Vitest, Mocha, Jasmine, `node:test` |
+| Go | `*_test.go` | `func TestXxx(t *testing.T)` |
+| Rust | every `.rs` file | `#[test]`, `#[tokio::test]` and friends, `#[rstest]`, `#[test_case]` |
+| Java | every `.java` file | `@Test`, `@ParameterizedTest`, `@RepeatedTest`, `@TestFactory`, `@TestTemplate` |
+| Kotlin | every `.kt` file | `@Test` and friends |
+| C# | every `.cs` file | `[Fact]`, `[Theory]`, `[Test]`, `[TestCase]`, `[TestMethod]`, `[DataTestMethod]` |
+| Ruby | `*_spec.rb`, `*_test.rb`, `test_*.rb` | RSpec `it`/`specify`/`example`/`scenario` inside `describe`/`context`/`feature`; Minitest `def test_*`; Rails `test "…"` |
+| PHP | `*Test.php`, anything in a test directory | PHPUnit `test*` methods, `#[Test]` and `@test`; Pest `test` and `it` inside `describe` |
+| Swift | every `.swift` file | XCTest `test*` methods on `XCTestCase` subclasses; Swift Testing `@Test` |
+| Scala | `*Test`, `*Spec`, `*Suite.scala`, anything in a test directory | `test("…")` and `it("…")`: MUnit, ScalaTest `FunSuite` and `FunSpec` |
+| C | `test_*.c`, `*_test.c`, anything in a test directory | functions named `test*`: Unity, CMocka |
+| C++ | `*_test.*`, `*_unittest.*`, `*Test.*`, anything in a test directory | GoogleTest `TEST`, `TEST_F`, `TEST_P`, `TYPED_TEST`; Catch2 and doctest `TEST_CASE`, `SCENARIO` |
+| Elixir | `*_test.exs` | ExUnit `test "…"` inside `describe` |
+| Dart | `*_test.dart` | `test` and `testWidgets` inside `group` |
+| Zig | every `.zig` file | `test "…" {}` |
+| Lua | `*_spec.lua`, `*_test.lua`, anything in a test directory | busted `it` inside `describe` |
+| Haskell | `*Spec.hs`, `*Test.hs`, anything in a test directory | Hspec `it`/`specify`/`prop`; tasty `testCase`/`testProperty` inside `testGroup` |
+| Julia | `runtests.jl`, anything in a test directory | the innermost `@testset "…"` |
+| OCaml | `test_*.ml`, `*_test.ml`, anything in a test directory | Alcotest `test_case "…"` |
+| F# | `*Test.fs`, `*Tests.fs`, anything in a test directory | `[<Fact>]`, `[<Test>]` and friends; Expecto `testCase` inside `testList` |
+
+A test directory is one named `test`, `tests`, `spec`, `specs` or `__tests__`. Doc
+comments right above a test count as its docstring, which is what the `openai` backend
+reads.
 
 ---
 
@@ -243,11 +292,25 @@ must go on.
 - **Skip and xfail markers don't apply under `--vibes`.** pytest evaluates them during
   setup, and under `--vibes` nothing sets up. Skipped tests are judged like everyone else.
 - **What gets searched.** `PATH` can be a directory or a single file. A file named
-  directly is collected whatever it's called. When walking a directory, `slop-test` skips
-  hidden directories, `__pycache__`, `node_modules`, `venv`, `build`, `dist`,
-  `site-packages` and `*.egg-info`, so `slop-test run .` won't judge your dependencies.
-- **Files that don't parse are skipped** with a warning, and the run carries on:
+  directly is collected whatever it's called, as long as it's in a supported language.
+  When walking a directory, `slop-test` skips hidden directories and the usual dependency
+  and build output (`node_modules`, `vendor`, `venv`, `site-packages`, `target`, `build`,
+  `dist`, `bin`, `obj`, `deps`, `_build`, `Pods`, `zig-out` and friends), so
+  `slop-test run .` won't judge your dependencies.
+- **Tests have to be written down.** Names are read from source, so tests generated in a
+  loop or named by string concatenation (`it('handles ' + method, …)`) aren't found, and a
+  parametrized test appears once.
+- **C and C++ macros are guesswork.** tree-sitter can't expand macros, so a macro-heavy
+  file can hide the odd test. On fmt's suite, `slop-test` finds 658 of its 670 GoogleTest
+  tests.
+- **Some languages are out.** Groovy's Spock (the grammar can't parse methods named with
+  strings), Perl (`Test::More` tests have no names), and bats (`@test` isn't Bash).
+- **Files that can't be read are skipped** with a warning, and the run carries on: Python
+  with syntax errors, a file named directly in a language `slop-test` doesn't know, or a
+  grammar that won't load.
   `! skipped tests/test_broken.py: could not parse it, felt nothing`
+- **Feelings take up space.** The grammars are about 8 MB to download and 70 MB
+  installed.
 - **Emotional passes are passes.** They count toward `passed` in the summary. Under
   pytest they show up as `~` in the progress line and as `PASSED EMOTIONALLY` with `-v`.
 - **Outages count at 50% confidence.** The fallback verdict carries a confidence of 0.5,

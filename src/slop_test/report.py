@@ -55,6 +55,18 @@ class Reporter:
     def __init__(self, console: Console, tests: Sequence[DiscoveredTest]) -> None:
         self.console = console
         self.name_width = max((len(t.qualname) for t in tests), default=0)
+        # Same-named tests in different files are indistinguishable without headings.
+        self.show_files = len({t.file for t in tests}) > 1
+        self._file: Path | None = None
+
+    def starting(self, test: DiscoveredTest) -> None:
+        """Call before judging each test, so its file heading comes before any retries."""
+        if not self.show_files or test.file == self._file:
+            return
+        if self._file is not None:
+            self.console.print()
+        self._file = test.file
+        self.console.print(Text(f"{test.file} ({test.language})", "dim"))
 
     def unparsable(self, file: Path) -> None:
         self.console.print(Text(f"! skipped {file}: could not parse it, felt nothing", "yellow"))
