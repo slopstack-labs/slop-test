@@ -283,8 +283,10 @@ def roast(
         headline = _pick(test, status, HEADLINES[status])
 
     who = None if gentle else blame(test)
+    # Only mention timing to the model when it's worth a joke, or it'll joke about it anyway.
+    noteworthy = who if who is not None and _when_to_roast(who) else None
     written = (
-        model.roast(test, verdict=headline, findings=kinds, who=who, gentle=gentle)
+        model.roast(test, verdict=headline, findings=kinds, who=noteworthy, gentle=gentle)
         if model
         else None
     )

@@ -10,11 +10,13 @@ from slop_test.backends.openai_compat import (
     ARE_YOU_SURE,
     FALLBACK,
     GENTLE_ROAST_TASK,
+    IN_CHARACTER,
     MAX_ASSERTION_LENGTH,
     MAX_LINE_LENGTH,
     MAX_REASON_LENGTH,
     MAX_ROAST_LENGTH,
     MAX_ROASTS,
+    ROAST_REPLY,
     ROAST_TASK,
     ModelRoast,
     OpenAICompatBackend,
@@ -291,7 +293,7 @@ def test_roast_sends_the_code_and_returns_headline_and_roasts():
 
     assert written == ModelRoast("Doomed, frankly", ("Asserts nothing, firmly.", "hunter2?"))
     messages = json.loads(requests[0].content)["messages"]
-    assert messages[0]["content"] == ROAST_TASK
+    assert messages[0]["content"] == ROAST_TASK + ROAST_REPLY
     prompt = messages[-1]["content"]
     assert "Verdict: passed, but it checks nothing" in prompt
     assert "no assertions, vague name" in prompt
@@ -461,24 +463,47 @@ def test_roasting_the_developer_tells_the_model_who_did_it():
     )
 
     rude, gentle = (json.loads(r.content)["messages"] for r in requests)
-    assert rude[0]["content"] == ROAST_TASK
+    assert rude[0]["content"] == ROAST_TASK + ROAST_REPLY
     assert "Last committed: on a Friday at 17:42" in rude[-1]["content"]
     assert "never use a name" in rude[0]["content"]
-    assert gentle[0]["content"] == GENTLE_ROAST_TASK
+    assert gentle[0]["content"] == GENTLE_ROAST_TASK + ROAST_REPLY
     assert "Last committed" not in gentle[-1]["content"]
 
 
-@pytest.mark.parametrize(
-    ("who", "described"),
-    [(None, "unknown"), (Blame(None), "never: it isn't even committed")],
-)
-def test_roasting_without_a_known_culprit(who, described):
+def test_an_unremarkable_or_unknown_commit_time_goes_unmentioned():
     requests = []
 
     make_backend(replying('{"headline": "Busted"}', requests)).roast(
-        TEST, verdict="passed", findings=[], who=who
+        TEST, verdict="passed", findings=[], who=None
     )
 
-    assert (
-        f"Last committed: {described}" in json.loads(requests[0].content)["messages"][-1]["content"]
+    assert "Last committed" not in json.loads(requests[0].content)["messages"][-1]["content"]
+
+
+def test_an_uncommitted_test_is_mentioned():
+    requests = []
+
+    make_backend(replying('{"headline": "Busted"}', requests)).roast(
+        TEST, verdict="passed", findings=[], who=Blame(None)
     )
+
+    prompt = json.loads(requests[0].content)["messages"][-1]["content"]
+    assert "Last committed: never: it isn't even committed" in prompt
+
+
+def test_roasts_stay_in_character_and_short():
+    requests = []
+    bard = PERSONAS["bard"]
+
+    make_backend(replying('{"headline": "Alas"}', requests), persona=bard).roast(
+        TEST, verdict="passed", findings=[]
+    )
+    make_backend(replying('{"headline": "Meh"}', requests)).roast(
+        TEST, verdict="passed", findings=[]
+    )
+
+    in_character, plain = (json.loads(r.content)["messages"][0]["content"] for r in requests)
+    assert in_character.startswith(bard.prompt)
+    assert IN_CHARACTER in in_character
+    assert IN_CHARACTER not in plain
+    assert "under 20 words" in plain

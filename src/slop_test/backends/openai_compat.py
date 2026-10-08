@@ -48,28 +48,33 @@ Reply with only a JSON object and nothing else:
 "reason": "<one short, funny sentence>", "assertion": "<one line of code in the test's \
 language: the assertion you imagine, then a comment saying whether it holds>"}"""
 
-_ROAST_REPLY = """
+ROAST_REPLY = """
 
 Reply with only a JSON object and nothing else:
-{"headline": "<the verdict, in a few words>", \
-"roasts": ["<one sentence>", "<optionally, one more>"]}"""
+{"headline": "<the verdict, in five words or fewer>", \
+"roasts": ["<one short sentence, under 20 words>", "<optionally, one more>"]}"""
+IN_CHARACTER = (
+    " Write the headline and every roast in your own voice, as the character you're "
+    "playing, not as a generic reviewer."
+)
 
 ROAST_TASK = (
     "You are reviewing one test from someone's test suite, pessimistically. Roast the "
     "developer who wrote it, through what this code says about them: their habits, "
-    "shortcuts, priorities and coping mechanisms, and when they committed it. They asked "
+    "shortcuts, priorities and coping mechanisms, and when they committed it, if that's "
+    "given. They asked "
     'for this, so be merciless and specific. Talk to them directly, as "you": never use a '
     "name, and never guess their pronouns. "
     "Stick to what the code and its history show: never their looks, identity, or "
     "anything outside their work. The verdict is already decided; write a headline that "
-    "says the same thing in your own words." + _ROAST_REPLY
+    "says the same thing in your own words."
 )
 GENTLE_ROAST_TASK = (
     "You are reviewing one test from someone's test suite, pessimistically. Roast the "
     "test's code: what it fails to check, how it's written, what it gets away with. Be "
     "funny, specific to this code, and brief. Roast the code, never the person. The "
     "verdict is already decided; write a headline that says the same thing in your own "
-    "words." + _ROAST_REPLY
+    "words."
 )
 
 SAY_TASK = "Reply with one short sentence and nothing else: no quotes, no preamble."
@@ -161,7 +166,9 @@ class OpenAICompatBackend:
 
         Always sends the test's code, whatever `read_the_code` says: there's no roasting
         code you haven't read. Unless `gentle`, the roasts are aimed at the developer, and
-        `who` (from git blame) says when they last committed it. Never who they are.
+        `who` (from git blame), if given, says when they last committed it. Never who
+        they are. Only pass it when the timing is worth a joke; otherwise the model
+        mentions it every time.
         """
         problems = ", ".join(kind.replace("_", " ") for kind in findings) or "none"
         prompt = (
@@ -170,10 +177,11 @@ class OpenAICompatBackend:
             f"Verdict: {verdict}\n"
             f"Problems already found: {problems}\n"
         )
-        if not gentle:
+        if not gentle and who is not None:
             prompt += f"Last committed: {_describe(who)}\n"
         prompt += f"Code:\n{test.source}"
         task = GENTLE_ROAST_TASK if gentle else ROAST_TASK
+        task += (IN_CHARACTER if self.persona else "") + ROAST_REPLY
         try:
             return self._ask(self._messages(task, prompt), parse_roast)
         except Exception:
@@ -272,9 +280,7 @@ def parse_line(content: str) -> str:
     return _tidy(line, MAX_LINE_LENGTH)
 
 
-def _describe(who: Blame | None) -> str:
-    if who is None:
-        return "unknown"
+def _describe(who: Blame) -> str:
     if who.when is None:
         return "never: it isn't even committed"
     return f"on a {who.when:%A} at {who.when:%H:%M}"

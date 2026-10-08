@@ -33,72 +33,82 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption(
         "--vibes",
         action="store_true",
-        help="Replace each test's real outcome with how it feels. Runs no test code.",
+        help="Replace each test's real outcome with how it feels. No test body, fixture or "
+        "setup runs.",
     )
     group.addoption(
         "--vibes-backend",
         choices=(*BACKEND_NAMES, *ALIASES),
         default="mock",
-        help="Who decides how your tests feel. openai is an old name for llm. Default: mock.",
+        help="Who judges under --vibes. mock: an offline coin flip with stock reasons. llm: a "
+        "model, set up with the SLOP_TEST_* variables (see slop-test run --help). openai is "
+        "an old name for llm. Default: mock.",
     )
     group.addoption(
         "--vibes-retries",
         type=int,
         default=3,
         metavar="N",
-        help="Empathetic retries for each failed test. Default: 3.",
+        help="How many more tries a failed test gets, each after a pep talk. A pass on a "
+        "retry is PASSED EMOTIONALLY. Default: 3.",
     )
     group.addoption(
         "--vibes-strict",
         action="store_true",
-        help='Ask the backend "Are you sure?" once per test.',
+        help='After each verdict, ask "Are you sure?" once. The answer is final.',
     )
     group.addoption(
         "--vibes-seed",
         type=int,
         default=None,
         metavar="N",
-        help="Seed for the mock backend's feelings. Default: random.",
+        help="Makes the mock backend's verdicts reproducible. Default: random, printed at the "
+        "end of the run.",
     )
     group.addoption(
         "--vibes-read-the-code",
         action="store_true",
-        help="Also send each test's body to the backend.",
+        help="Send each test's code to the model, not just its name and docstring. llm only.",
     )
     group.addoption(
         "--vibes-persona",
         choices=PERSONA_CHOICES,
         default=personas.RANDOM,
-        help="Whose voice a model judges in. Default: a new one each run.",
+        help="Whose voice the model judges in under --vibes. llm only. Default: a new one "
+        "each run.",
     )
     group.addoption(
         "--vibes-jury",
         type=int,
         default=1,
         metavar="N",
-        help="Judges per test, each with its own persona. They vote. Default: 1.",
+        help="How many judges each test gets under --vibes, each a different persona. The "
+        "majority wins and the losing side dissents. Default: 1.",
     )
     group.addoption(
         "--roast",
         action="store_true",
-        help="Run tests for real, fail the ones that check nothing, and roast the rest.",
+        help="Run tests for real, then judge them like a pessimist: real failures fail, so do "
+        "passing tests that check nothing, and every test gets roasted.",
     )
     group.addoption(
         "--roast-backend",
         choices=(*BACKEND_NAMES, *ALIASES),
         default="mock",
-        help="Who writes the roasts: built-in lines (mock) or a model (llm). Default: mock.",
+        help="Who writes the roasts under --roast: built-in lines (mock) or a model (llm). "
+        "Pass/fail doesn't depend on it. Default: mock.",
     )
     group.addoption(
         "--roast-persona",
         choices=PERSONA_CHOICES,
         default=personas.RANDOM,
-        help="Whose voice a model roasts in. Default: a new one each run.",
+        help="Whose voice the model roasts in under --roast. llm only. Default: a new one "
+        "each run.",
     )
     group.addoption(
         "--roast-gentle",
         action="store_true",
-        help="Roast the code, not whoever wrote it.",
+        help="Roast the code instead of whoever wrote it, and leave git blame out of it.",
     )
 
 
