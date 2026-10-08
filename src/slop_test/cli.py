@@ -10,7 +10,7 @@ from rich.console import Console
 
 from slop_test import __version__, personas
 from slop_test import roast as roasting
-from slop_test.backends import get_bench, resolve
+from slop_test.backends import choose, get_bench
 from slop_test.backends.mock import random_seed
 from slop_test.backends.openai_compat import OpenAICompatBackend
 from slop_test.discovery import DiscoveredTest, discover
@@ -53,8 +53,9 @@ PathArgument = Annotated[
 ]
 
 MODEL_SETTINGS = """\
-With --backend llm, these environment variables say which model to use. Any
-OpenAI-compatible endpoint works, local (Ollama, LM Studio) or hosted.
+These environment variables say which model the llm backend uses. Any
+OpenAI-compatible endpoint works, local (Ollama, LM Studio) or hosted. Until
+SLOP_TEST_BASE_URL and SLOP_TEST_MODEL are both set, the mock stands in.
 
   SLOP_TEST_BASE_URL     API root, e.g. http://localhost:11434/v1 for Ollama
   SLOP_TEST_MODEL        model name, e.g. gemma3:12b
@@ -92,10 +93,10 @@ def run(
         typer.Option(
             "--backend",
             help="Who judges. mock: an offline coin flip with stock reasons. llm: a model "
-            "(see below) writes every verdict, reason and pep talk. openai is an old name "
-            "for llm.",
+            "(see below) writes every verdict, reason and pep talk, or the mock does until "
+            "one is set up. openai is an old name for llm.",
         ),
-    ] = BackendName.mock,
+    ] = BackendName.llm,
     retries: Annotated[
         int,
         typer.Option(
@@ -175,7 +176,7 @@ def run(
         return
 
     # Only the mock has feelings worth reproducing.
-    show_seed = seed is None and backend_name is BackendName.mock
+    show_seed = seed is None and choose(backend_name.value) == "mock"
     if seed is None:
         seed = random_seed()
     bench = get_bench(
@@ -220,10 +221,11 @@ def roast_command(
         typer.Option(
             "--backend",
             help="Who writes the roasts. mock: built-in lines, offline. llm: a model (see "
-            "below) writes headlines, roasts and a closing remark. Pass/fail is decided "
-            "either way by slop-test's own checks. openai is an old name for llm.",
+            "below) writes headlines, roasts and a closing remark, or the mock does until "
+            "one is set up. Pass/fail is decided either way by slop-test's own checks. "
+            "openai is an old name for llm.",
         ),
-    ] = BackendName.mock,
+    ] = BackendName.llm,
     persona: Annotated[
         PersonaName,
         typer.Option(
@@ -259,7 +261,7 @@ def roast_command(
         return
 
     model = None
-    if resolve(backend_name.value) == "llm":
+    if choose(backend_name.value) == "llm":
         judge_persona = personas.pick(persona.value, random.Random())
         model = OpenAICompatBackend.from_env(read_the_code=True, persona=judge_persona)
         reporter.bench([judge_persona])

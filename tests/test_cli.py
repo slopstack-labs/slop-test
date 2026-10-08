@@ -63,26 +63,26 @@ def test_version():
 
 
 def test_run_examples_end_to_end():
-    result = invoke("run", EXAMPLES, "--seed", "0")
+    result = invoke("run", EXAMPLES, "--backend", "mock", "--seed", "0")
 
     assert result.exit_code == 0
     for test in discover(EXAMPLES).tests:
         assert test.qualname in result.output
     assert SUMMARY.search(result.output)
     assert "To feel this way again" not in result.output
-    assert invoke("run", EXAMPLES, "--seed", "0").output == result.output
+    assert invoke("run", EXAMPLES, "--backend", "mock", "--seed", "0").output == result.output
 
 
 def test_without_seed_every_run_is_random_and_says_how_to_repeat_it(monkeypatch):
     seeds = iter([11, 12])
     monkeypatch.setattr("slop_test.cli.random_seed", lambda: next(seeds))
 
-    first = invoke("run", EXAMPLES).output
-    second = invoke("run", EXAMPLES).output
+    first = invoke("run", EXAMPLES, "--backend", "mock").output
+    second = invoke("run", EXAMPLES, "--backend", "mock").output
 
     assert first.endswith("\nTo feel this way again: --seed 11\n")
     assert second.endswith("\nTo feel this way again: --seed 12\n")
-    again = invoke("run", EXAMPLES, "--seed", "11").output
+    again = invoke("run", EXAMPLES, "--backend", "mock", "--seed", "11").output
     assert again == first.removesuffix("To feel this way again: --seed 11\n")
 
 
@@ -169,7 +169,7 @@ def test_options_reach_the_backend(suite, scripted):
     invoke("run", suite, "--retries", "1", "--seed", "42")
 
     name, options = backend.requested
-    assert name == "mock"
+    assert name == "llm"
     assert options == {"seed": 42, "read_the_code": False, "persona": "random", "jury": 1}
     assert backend.judge_calls["test_flaky"] == 2
 
@@ -184,18 +184,18 @@ def test_read_the_code_reaches_the_backend(suite, scripted):
     assert options["read_the_code"] is True
 
 
-@pytest.mark.parametrize("name", ["llm", "openai"])
-def test_unconfigured_llm_backend_assumes_everything_is_fine(suite, monkeypatch, name):
-    monkeypatch.delenv("SLOP_TEST_BASE_URL", raising=False)
-    monkeypatch.delenv("SLOP_TEST_MODEL", raising=False)
+@pytest.mark.parametrize(
+    "args", [[], ["--backend", "llm"], ["--backend", "openai"]], ids=["default", "llm", "openai"]
+)
+def test_without_a_model_set_up_the_mock_judges(suite, monkeypatch, args):
     monkeypatch.setenv("SLOP_TEST_API_KEY", "sk-cli-do-not-print-me")
+    monkeypatch.setattr("slop_test.cli.random_seed", lambda: 11)
 
-    result = invoke("run", suite, "--backend", name, "--strict", "--honest-exit-codes")
+    result = invoke("run", suite, *args, "--strict")
 
-    assert result.exit_code == 0
-    assert result.output.count("(model unavailable, assumed fine)") == 3
+    assert result.output == invoke("run", suite, "--backend", "mock", "--strict").output
+    assert result.output.endswith("\nTo feel this way again: --seed 11\n")
     assert "sk-cli-do-not-print-me" not in result.output
-    assert "To feel this way again" not in result.output  # the model has no seed to repeat
 
 
 def test_help_disclaims_line_coverage():

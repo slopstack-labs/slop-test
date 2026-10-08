@@ -162,7 +162,7 @@ def test_vibes_without_seed_is_random_and_says_how_to_repeat_it(pytester, script
     backend = scripted()
     monkeypatch.setattr("slop_test.pytest_plugin.random_seed", lambda: 4242)
 
-    result = pytester.runpytest("--vibes")
+    result = pytester.runpytest("--vibes", "--vibes-backend=mock")
 
     assert backend.requested[1]["seed"] == 4242
     result.stdout.fnmatch_lines(["*vibe coverage", "To feel this way again: --vibes-seed 4242"])
@@ -192,7 +192,7 @@ def test_vibes_agree_with_slop_test_run(pytester):
         if len(set(expected.values())) == 3:
             break
 
-    result = pytester.runpytest("--vibes", "-v", "--vibes-seed", str(seed))
+    result = pytester.runpytest("--vibes", "-v", "--vibes-backend=mock", "--vibes-seed", str(seed))
 
     result.stdout.re_match_lines(
         [
