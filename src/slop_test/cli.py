@@ -22,6 +22,7 @@ app = typer.Typer(
 
 class BackendName(str, Enum):
     mock = "mock"
+    openai = "openai"
 
 
 def _print_version(value: bool) -> None:
@@ -67,6 +68,10 @@ def run(
         int,
         typer.Option("--seed", help="Seed for the mock backend's feelings."),
     ] = 0,
+    read_the_code: Annotated[
+        bool,
+        typer.Option("--read-the-code", help="Also send each test's body to the backend."),
+    ] = False,
     honest_exit_codes: Annotated[
         bool,
         typer.Option("--honest-exit-codes", help="Exit 1 if any test failed."),
@@ -76,6 +81,9 @@ def run(
 
     Vibe coverage is the mean confidence of every test that did not fail.
     It has no relation to line coverage.
+
+    --backend openai reads SLOP_TEST_BASE_URL, SLOP_TEST_API_KEY and SLOP_TEST_MODEL
+    from the environment.
 
     Exits 0, always, unless --honest-exit-codes is set.
     """
@@ -88,7 +96,7 @@ def run(
         console.print(f"No tests found in {path}. Nothing to feel.")
         return
 
-    backend = get_backend(backend_name.value, seed=seed)
+    backend = get_backend(backend_name.value, seed=seed, read_the_code=read_the_code)
     verdicts = []
     for test in discovery.tests:
         verdict = judge(test, backend, retries=retries, strict=strict, on_retry=reporter.retrying)

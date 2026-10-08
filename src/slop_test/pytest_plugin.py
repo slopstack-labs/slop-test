@@ -50,6 +50,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         metavar="N",
         help="Seed for the mock backend's feelings. Default: 0.",
     )
+    group.addoption(
+        "--vibes-read-the-code",
+        action="store_true",
+        help="Also send each test's body to the backend.",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -60,7 +65,9 @@ def pytest_configure(config: pytest.Config) -> None:
 class VibesPlugin:
     def __init__(self, config: pytest.Config) -> None:
         self.backend = get_backend(
-            config.getoption("vibes_backend"), seed=config.getoption("vibes_seed")
+            config.getoption("vibes_backend"),
+            seed=config.getoption("vibes_seed"),
+            read_the_code=config.getoption("vibes_read_the_code"),
         )
         self.retries: int = config.getoption("vibes_retries")
         self.strict: bool = config.getoption("vibes_strict")

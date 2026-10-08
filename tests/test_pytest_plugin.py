@@ -121,9 +121,16 @@ def test_vibes_options_reach_the_backend(pytester, scripted):
     pytester.makepyfile(SUITE)
     backend = scripted({"test_really_fails": ["failed"]})
 
-    pytester.runpytest("--vibes", "--vibes-strict", "--vibes-retries", "1", "--vibes-seed", "5")
+    pytester.runpytest(
+        "--vibes",
+        "--vibes-strict",
+        "--vibes-retries=1",
+        "--vibes-seed=5",
+        "--vibes-backend=openai",
+        "--vibes-read-the-code",
+    )
 
-    assert backend.requested == ("mock", {"seed": 5})
+    assert backend.requested == ("openai", {"seed": 5, "read_the_code": True})
     assert backend.judge_calls["test_really_fails"] == 2
     assert set(backend.sure_calls.values()) == {1}
     assert len(backend.sure_calls) == 4

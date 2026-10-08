@@ -132,8 +132,28 @@ def test_options_reach_the_backend(suite, scripted):
 
     invoke("run", suite, "--retries", "1", "--seed", "42")
 
-    assert backend.requested == ("mock", {"seed": 42})
+    assert backend.requested == ("mock", {"seed": 42, "read_the_code": False})
     assert backend.judge_calls["test_flaky"] == 2
+
+
+def test_read_the_code_reaches_the_backend(suite, scripted):
+    backend = scripted()
+
+    invoke("run", suite, "--backend", "openai", "--read-the-code")
+
+    assert backend.requested == ("openai", {"seed": 0, "read_the_code": True})
+
+
+def test_unconfigured_openai_backend_assumes_everything_is_fine(suite, monkeypatch):
+    monkeypatch.delenv("SLOP_TEST_BASE_URL", raising=False)
+    monkeypatch.delenv("SLOP_TEST_MODEL", raising=False)
+    monkeypatch.setenv("SLOP_TEST_API_KEY", "sk-cli-do-not-print-me")
+
+    result = invoke("run", suite, "--backend", "openai", "--strict", "--honest-exit-codes")
+
+    assert result.exit_code == 0
+    assert result.output.count("(model unavailable, assumed fine)") == 3
+    assert "sk-cli-do-not-print-me" not in result.output
 
 
 def test_help_disclaims_line_coverage():
