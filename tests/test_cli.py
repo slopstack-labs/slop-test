@@ -3,7 +3,7 @@ import textwrap
 from pathlib import Path
 
 import pytest
-from fakes import ScriptedBackend
+from fakes import ScriptedBackend, patch_bench
 from typer.testing import CliRunner
 
 from slop_test import __version__
@@ -48,11 +48,7 @@ def scripted(monkeypatch):
     def install(script=None, **kwargs):
         backend = ScriptedBackend(script, **kwargs)
 
-        def get_backend(name, **options):
-            backend.requested = (name, options)
-            return backend
-
-        monkeypatch.setattr("slop_test.cli.get_backend", get_backend)
+        patch_bench(monkeypatch, "slop_test.cli.get_bench", backend)
         return backend
 
     return install
@@ -170,7 +166,9 @@ def test_options_reach_the_backend(suite, scripted):
 
     invoke("run", suite, "--retries", "1", "--seed", "42")
 
-    assert backend.requested == ("mock", {"seed": 42, "read_the_code": False})
+    name, options = backend.requested
+    assert name == "mock"
+    assert options == {"seed": 42, "read_the_code": False, "persona": "random", "jury": 1}
     assert backend.judge_calls["test_flaky"] == 2
 
 

@@ -212,25 +212,31 @@ def roast(
         status = ran
         headline = _pick(test, status, HEADLINES[status])
 
-    roasts = model.roast(test, status=status, findings=kinds) if model else None
+    written = model.roast(test, verdict=headline, findings=kinds) if model else None
+    if written and written.headline:
+        headline = written.headline
+    roasts = written.roasts if written and written.roasts else ()
     if not roasts:
-        roasts = [_roast_line(test, kind, duration) for kind in kinds]
-    return Roast(status, headline, tuple(roasts))
+        roasts = tuple(_roast_line(test, kind, duration) for kind in kinds)
+    return Roast(status, headline, roasts)
 
 
-def summary_line(roasts: Sequence[Roast]) -> str:
+def summary_line(roasts: Sequence[Roast], closer: str | None = None) -> str:
+    """The counts, then `closer`, or a built-in remark that fits the counts."""
     counts = {status: sum(r.status == status for r in roasts) for status in ROAST_STATUSES}
     parts = [f"{counts['passed']} passed", f"{counts['failed']} failed"]
     parts += [f"{counts[s]} {s}" for s in ("skipped", "not run") if counts[s]]
-    if counts["failed"] == len(roasts):
-        closer = CLOSERS["all failed"]
-    elif counts["failed"]:
-        closer = CLOSERS["some failed"]
-    elif counts["passed"] == len(roasts):
-        closer = CLOSERS["all passed"]
-    else:
-        closer = CLOSERS["none ran"]
-    return f"{', '.join(parts)}. {closer}"
+    return f"{', '.join(parts)}. {closer or _built_in_closer(counts, len(roasts))}"
+
+
+def _built_in_closer(counts: dict[RoastStatus, int], total: int) -> str:
+    if counts["failed"] == total:
+        return CLOSERS["all failed"]
+    if counts["failed"]:
+        return CLOSERS["some failed"]
+    if counts["passed"] == total:
+        return CLOSERS["all passed"]
+    return CLOSERS["none ran"]
 
 
 def _roast_line(test: DiscoveredTest, kind: str, duration: float | None) -> str:

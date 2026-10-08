@@ -4,6 +4,7 @@ import pytest
 from fakes import make_test
 from typer.testing import CliRunner
 
+from slop_test.backends.openai_compat import ModelRoast
 from slop_test.cli import app
 from slop_test.roast import CLOSERS, HEADLINES, ROASTS, Roast, critique, roast, summary_line
 
@@ -154,26 +155,36 @@ class FakeModel:
         self.reply = reply
         self.calls = []
 
-    def roast(self, test, *, status, findings):
-        self.calls.append((test.name, status, findings))
+    def roast(self, test, *, verdict, findings):
+        self.calls.append((test.name, verdict, findings))
         return self.reply
 
 
-def test_a_model_writes_the_roasts_when_it_can():
-    model = FakeModel(["Bespoke insult."])
+def test_a_model_writes_the_headline_and_roasts_when_it_can():
+    model = FakeModel(ModelRoast("Dead on arrival", ("Bespoke insult.",)))
 
     result = roast(EMPTY, "passed", model=model)
 
+    assert result.headline == "Dead on arrival"
     assert result.roasts == ("Bespoke insult.",)
     assert result.status == "failed"  # the model writes jokes, not verdicts
-    assert model.calls == [("test_charge", "failed", ["no_assertions"])]
+    assert model.calls == [("test_charge", "passed, but it checks nothing", ["no_assertions"])]
 
 
-@pytest.mark.parametrize("reply", [None, []], ids=["unavailable", "speechless"])
-def test_built_in_roasts_take_over_when_the_model_cant(reply):
-    result = roast(EMPTY, model=FakeModel(reply))
+def test_built_in_lines_fill_in_whatever_the_model_left_out():
+    headline_only = roast(EMPTY, "passed", model=FakeModel(ModelRoast("Yikes", ())))
+    roasts_only = roast(EMPTY, "passed", model=FakeModel(ModelRoast(None, ("Ouch.",))))
 
-    assert result.roasts == roast(EMPTY).roasts
+    assert headline_only.headline == "Yikes"
+    assert headline_only.roasts == roast(EMPTY, "passed").roasts
+    assert roasts_only.headline == roast(EMPTY, "passed").headline
+    assert roasts_only.roasts == ("Ouch.",)
+
+
+def test_built_in_roasts_take_over_when_the_model_cant():
+    result = roast(EMPTY, model=FakeModel(None))
+
+    assert result == roast(EMPTY)
     assert result.roasts[0] in ROASTS["no_assertions"]
 
 
@@ -240,4 +251,6 @@ def test_cli_roast_with_an_unconfigured_model_uses_built_in_roasts(suite, monkey
 
     with_model = runner.invoke(app, ["roast", str(suite), "--backend", "llm"])
 
-    assert with_model.output == runner.invoke(app, ["roast", str(suite)]).output
+    presiding, blank, *rest = with_model.output.splitlines(keepends=True)
+    assert presiding.startswith("Presiding: ")
+    assert "".join(rest) == runner.invoke(app, ["roast", str(suite)]).output

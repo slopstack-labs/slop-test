@@ -3,7 +3,7 @@ from importlib.metadata import entry_points
 from pathlib import Path
 
 import pytest
-from fakes import ScriptedBackend
+from fakes import ScriptedBackend, patch_bench
 
 from slop_test.backends.mock import MockBackend
 from slop_test.discovery import discover
@@ -49,11 +49,7 @@ def scripted(monkeypatch):
     def install(script=None, **kwargs):
         backend = ScriptedBackend(script, **kwargs)
 
-        def get_backend(name, **options):
-            backend.requested = (name, options)
-            return backend
-
-        monkeypatch.setattr("slop_test.pytest_plugin.get_backend", get_backend)
+        patch_bench(monkeypatch, "slop_test.pytest_plugin.get_bench", backend)
         return backend
 
     return install
@@ -150,9 +146,13 @@ def test_vibes_options_reach_the_backend(pytester, scripted):
         "--vibes-seed=5",
         "--vibes-backend=llm",
         "--vibes-read-the-code",
+        "--vibes-persona=bard",
+        "--vibes-jury=3",
     )
 
-    assert backend.requested == ("llm", {"seed": 5, "read_the_code": True})
+    name, options = backend.requested
+    assert name == "llm"
+    assert options == {"seed": 5, "read_the_code": True, "persona": "bard", "jury": 3}
     assert backend.judge_calls["test_really_fails"] == 2
     assert set(backend.sure_calls.values()) == {1}
     assert len(backend.sure_calls) == 4
@@ -248,9 +248,9 @@ def test_roast_runs_tests_for_real_and_fails_the_weak_ones(pytester):
         [
             "*assert (1 + 1) == 3*",
             "*_ test_checks_nothing _*",
-            "It passed, but it checks nothing.",
+            "Passed, but it checks nothing.",
             "*_ test_vat_is_correct _*",
-            "It passed, but only proves that true is true.",
+            "Passed, but only proves that true is true.",
             "*= roast =*",
             "✗ *::test_really_fails: failed*",
             "✗ *::test_checks_nothing: passed, but it checks nothing",

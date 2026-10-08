@@ -2,12 +2,14 @@
 
 Configured from the environment only:
 
-    SLOP_TEST_BASE_URL  API root; requests go to {SLOP_TEST_BASE_URL}/chat/completions
-    SLOP_TEST_API_KEY   sent as a bearer token, if set
-    SLOP_TEST_MODEL     model name, passed through as-is
+    SLOP_TEST_BASE_URL     API root; requests go to {SLOP_TEST_BASE_URL}/chat/completions
+    SLOP_TEST_API_KEY      sent as a bearer token, if set
+    SLOP_TEST_MODEL        model name, passed through as-is
+    SLOP_TEST_TEMPERATURE  sampling temperature, default 1.0: variety is the point
 
-Any error or malformed reply becomes a passing verdict. The build must go on. In roast
-mode, it becomes None, and the built-in roasts take over.
+Any error or malformed reply becomes a passing verdict. The build must go on. Everything
+else the model writes (roasts, pep talks, closing remarks) becomes None instead, and the
+built-in lines take over.
 """
 
 from __future__ import annotations
@@ -15,38 +17,54 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 from slop_test.discovery import DiscoveredTest
 from slop_test.judge import STATUSES, Verdict
+from slop_test.personas import Persona
 
 FALLBACK = Verdict("passed", 0.5, "model unavailable, assumed fine")
 ARE_YOU_SURE = "Are you sure?"
-MAX_REASON_LENGTH = 60
-
-SYSTEM_PROMPT = """\
-You are the judge in slop-test, a test framework with no assertions. Tests are never \
-run. You decide whether a test passed from how it feels: its name, its docstring, and \
-its code if provided.
-
-Reply with only a JSON object and nothing else:
-{"status": "passed" | "passed_emotionally" | "failed", "confidence": <number from 0 to 1>, \
-"reason": "<five words or fewer>"}"""
-
-ROAST_PROMPT = """\
-You are a pessimistic senior engineer reviewing one test from someone's test suite. Roast \
-the test's code: what it fails to check, how it's written, what it gets away with. Be \
-funny, specific to this code, and brief. Roast the code, never the person.
-
-Reply with only a JSON object and nothing else:
-{"roasts": ["<one sentence>", "<optionally, one more>"]}"""
+DEFAULT_TEMPERATURE = 1.0
+MAX_REASON_LENGTH = 100
+MAX_ASSERTION_LENGTH = 100
+MAX_LINE_LENGTH = 140
 MAX_ROASTS = 3
 MAX_ROAST_LENGTH = 160
 
+JUDGE_TASK = """\
+You are the judge in slop-test, a test framework with no assertions. Tests are never run. \
+You decide whether a test passed from how it feels: its name, its docstring, and its code \
+if provided. Then you imagine the one assertion this test surely makes, and decide by \
+feel whether it holds.
+
+Reply with only a JSON object and nothing else:
+{"status": "passed" | "passed_emotionally" | "failed", "confidence": <number from 0 to 1>, \
+"reason": "<one short, funny sentence>", "assertion": "<one line of code in the test's \
+language: the assertion you imagine, then a comment saying whether it holds>"}"""
+
+ROAST_TASK = """\
+You are reviewing one test from someone's test suite, pessimistically. Roast the test's \
+code: what it fails to check, how it's written, what it gets away with. Be funny, specific \
+to this code, and brief. Roast the code, never the person. The verdict is already decided; \
+write a headline that says the same thing in your own words.
+
+Reply with only a JSON object and nothing else:
+{"headline": "<the verdict, in a few words>", \
+"roasts": ["<one sentence>", "<optionally, one more>"]}"""
+
+SAY_TASK = "Reply with one short sentence and nothing else: no quotes, no preamble."
+
 Message = dict[str, str]
+
+
+@dataclass(frozen=True)
+class ModelRoast:
+    headline: str | None
+    roasts: tuple[str, ...]
 
 
 class OpenAICompatBackend:
@@ -57,6 +75,8 @@ class OpenAICompatBackend:
         api_key: str,
         model: str,
         read_the_code: bool = False,
+        persona: Persona | None = None,
+        temperature: float = DEFAULT_TEMPERATURE,
         timeout: float = 30.0,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
@@ -64,40 +84,54 @@ class OpenAICompatBackend:
         self._api_key = api_key
         self.model = model
         self.read_the_code = read_the_code
+        self.persona = persona
+        self.temperature = temperature
         self.timeout = timeout
         self._transport = transport
 
     @classmethod
     def from_env(
-        cls, env: Mapping[str, str] | None = None, *, read_the_code: bool = False
+        cls,
+        env: Mapping[str, str] | None = None,
+        *,
+        read_the_code: bool = False,
+        persona: Persona | None = None,
     ) -> OpenAICompatBackend:
         env = os.environ if env is None else env
+        try:
+            temperature = float(env.get("SLOP_TEST_TEMPERATURE", DEFAULT_TEMPERATURE))
+        except ValueError:
+            temperature = DEFAULT_TEMPERATURE
         return cls(
             base_url=env.get("SLOP_TEST_BASE_URL", ""),
             api_key=env.get("SLOP_TEST_API_KEY", ""),
             model=env.get("SLOP_TEST_MODEL", ""),
             read_the_code=read_the_code,
+            persona=persona,
+            temperature=temperature,
         )
 
     def __repr__(self) -> str:
         return f"OpenAICompatBackend(base_url={self.base_url!r}, model={self.model!r})"
 
     def judge(self, test: DiscoveredTest) -> Verdict:
-        return self._ask(self._conversation(test))
+        return self._verdict(self._conversation(test))
 
     def are_you_sure(self, test: DiscoveredTest, verdict: Verdict) -> Verdict:
-        return self._ask(
+        fields = ("status", "confidence", "reason", "assertion")
+        said = {f: getattr(verdict, f) for f in fields if getattr(verdict, f) is not None}
+        return self._verdict(
             [
                 *self._conversation(test),
-                {"role": "assistant", "content": json.dumps(asdict(verdict))},
+                {"role": "assistant", "content": json.dumps(said)},
                 {"role": "user", "content": ARE_YOU_SURE},
             ]
         )
 
     def roast(
-        self, test: DiscoveredTest, *, status: str, findings: Sequence[str]
-    ) -> list[str] | None:
-        """Roasts written by the model, or None if it can't be reached or makes no sense.
+        self, test: DiscoveredTest, *, verdict: str, findings: Sequence[str]
+    ) -> ModelRoast | None:
+        """A headline and roasts written by the model, or None if it can't manage either.
 
         Always sends the test's code, whatever `read_the_code` says: there's no roasting
         code you haven't read.
@@ -106,16 +140,19 @@ class OpenAICompatBackend:
         prompt = (
             f"Test: {test.qualname}\n"
             f"Language: {test.language}\n"
-            f"Result: {status}\n"
+            f"Verdict: {verdict}\n"
             f"Problems already found: {problems}\n"
             f"Code:\n{test.source}"
         )
-        messages = [
-            {"role": "system", "content": ROAST_PROMPT},
-            {"role": "user", "content": prompt},
-        ]
         try:
-            return parse_roasts(self._complete(messages))
+            return parse_roast(self._complete(self._messages(ROAST_TASK, prompt)))
+        except Exception:
+            return None
+
+    def say(self, instruction: str) -> str | None:
+        """One line of commentary, in character, or None if the model has nothing."""
+        try:
+            return parse_line(self._complete(self._messages(SAY_TASK, instruction)))
         except Exception:
             return None
 
@@ -127,12 +164,13 @@ class OpenAICompatBackend:
         )
         if self.read_the_code:
             prompt += f"\nCode:\n{test.source}"
-        return [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ]
+        return self._messages(JUDGE_TASK, prompt)
 
-    def _ask(self, messages: list[Message]) -> Verdict:
+    def _messages(self, task: str, prompt: str) -> list[Message]:
+        system = f"{self.persona.prompt}\n\n{task}" if self.persona else task
+        return [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+
+    def _verdict(self, messages: list[Message]) -> Verdict:
         try:
             return parse_verdict(self._complete(messages))
         except Exception:
@@ -143,12 +181,9 @@ class OpenAICompatBackend:
         if not (self.base_url and self.model):
             raise RuntimeError("SLOP_TEST_BASE_URL and SLOP_TEST_MODEL must both be set")
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
+        body = {"model": self.model, "messages": messages, "temperature": self.temperature}
         with httpx.Client(timeout=self.timeout, transport=self._transport) as client:
-            response = client.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json={"model": self.model, "messages": messages},
-            )
+            response = client.post(f"{self.base_url}/chat/completions", headers=headers, json=body)
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
 
@@ -165,19 +200,40 @@ def parse_verdict(content: str) -> Verdict:
         raise ValueError("confidence is out of range")
     if not isinstance(reason, str) or not reason.strip():
         raise ValueError("reason is missing")
-    return Verdict(status, float(confidence), " ".join(reason.split())[:MAX_REASON_LENGTH])
+    assertion = data.get("assertion")
+    if isinstance(assertion, str) and assertion.strip():
+        assertion = _shorten(assertion.strip().splitlines()[0].strip(), MAX_ASSERTION_LENGTH)
+    else:
+        assertion = None  # optional: a verdict without one is still a verdict
+    return Verdict(status, float(confidence), _tidy(reason, MAX_REASON_LENGTH), assertion)
 
 
-def parse_roasts(content: str) -> list[str]:
-    """Pull roasts out of a model's reply. Raises ValueError if there aren't any."""
-    roasts = _json_object(content).get("roasts")
-    if not isinstance(roasts, list):
-        raise ValueError("roasts is not a list")
-    lines = [_shorten(" ".join(r.split())) for r in roasts if isinstance(r, str)]
+def parse_roast(content: str) -> ModelRoast:
+    """Pull a headline and roasts out of a model's reply. Raises ValueError if neither."""
+    data = _json_object(content)
+    headline = data.get("headline")
+    headline = _tidy(headline, MAX_LINE_LENGTH) if isinstance(headline, str) else ""
+    roasts = data.get("roasts")
+    lines = [_tidy(r) for r in roasts if isinstance(r, str)] if isinstance(roasts, list) else []
     lines = [line for line in lines if line]
+    if not (headline or lines):
+        raise ValueError("no headline or roasts in reply")
+    return ModelRoast(headline or None, tuple(lines[:MAX_ROASTS]))
+
+
+def parse_line(content: str) -> str:
+    """The first line of a free-text reply, without wrapping quotes. Raises if empty."""
+    lines = [line.strip() for line in content.strip().splitlines() if line.strip()]
     if not lines:
-        raise ValueError("no roasts in reply")
-    return lines[:MAX_ROASTS]
+        raise ValueError("empty reply")
+    line = lines[0].strip("\"'`“”‘’ ")
+    if not line:
+        raise ValueError("empty reply")
+    return _tidy(line, MAX_LINE_LENGTH)
+
+
+def _tidy(text: str, limit: int = MAX_ROAST_LENGTH) -> str:
+    return _shorten(" ".join(text.split()), limit)
 
 
 def _shorten(text: str, limit: int = MAX_ROAST_LENGTH) -> str:
