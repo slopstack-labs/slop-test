@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, TypeVar
@@ -261,12 +262,23 @@ def _shorten(text: str, limit: int = MAX_ROAST_LENGTH) -> str:
     return cut[: limit - 1].rsplit(" ", 1)[0].rstrip(",;:") + "…"
 
 
+# A value in single quotes, as models write when the text inside is full of double quotes:
+# "assertion": 'assert "dark" in {"dark", "light"}'
+_SINGLE_QUOTED_VALUE = re.compile(r":\s*'(.*?)'(?=\s*[,}\n])")
+
+
 def _json_object(content: str) -> dict[str, Any]:
-    """The JSON object in a model's reply, ignoring any chatter or code fences around it."""
+    """The JSON object in a model's reply, ignoring any chatter or code fences around it,
+    and forgiving values in single quotes."""
     start, end = content.find("{"), content.rfind("}")
     if start == -1 or end < start:
         raise ValueError("no JSON object in reply")
-    data = json.loads(content[start : end + 1])
+    text = content[start : end + 1]
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        repaired = _SINGLE_QUOTED_VALUE.sub(lambda m: ": " + json.dumps(m.group(1)), text)
+        data = json.loads(repaired)
     if not isinstance(data, dict):
         raise ValueError("reply is not a JSON object")
     return data

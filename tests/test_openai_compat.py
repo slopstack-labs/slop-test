@@ -424,3 +424,23 @@ def test_roasts_and_lines_get_a_second_chance_too():
 
     assert backend.roast(TEST, verdict="passed", findings=[]).roasts == ("Second time lucky.",)
     assert backend.say("Say hi.") == "Hi."
+
+
+def test_single_quoted_values_are_forgiven():
+    content = """```json
+{
+  "status": "passed_emotionally",
+  "confidence": 0.85,
+  "reason": "It's either dark or light!",
+  "assertion": 'assert "dark" in {"dark", "light"}  # Holds'
+}
+```"""
+
+    verdict = make_backend(replying(content)).judge(TEST)
+
+    assert verdict == Verdict(
+        "passed_emotionally",
+        0.85,
+        "It's either dark or light!",
+        'assert "dark" in {"dark", "light"}  # Holds',
+    )
